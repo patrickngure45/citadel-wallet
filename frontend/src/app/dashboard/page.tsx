@@ -508,63 +508,85 @@ export default function Dashboard() {
                 <h2 className="text-xl font-bold text-white">Premium Services</h2>
             </div>
             
-            <div className="p-1 rounded-2xl bg-gradient-to-r from-indigo-500/20 via-purple-500/20 to-pink-500/20">
-                <div className="bg-black/90 p-6 rounded-xl backdrop-blur-sm">
-                    <div className="flex items-start justify-between">
-                        <div>
-                            <h3 className="text-lg font-bold text-white mb-1">P2P Escrow Agreement</h3>
-                            <p className="text-sm text-white/50 max-w-lg mb-4">
-                                Securely lock funds with a counterparty using Citadel's smart contract infrastructure. 
-                                <span className="text-indigo-400 block mt-1 font-medium">Requires 100 TST Holdings</span>
-                            </p>
-                            
-                            <button 
-                                onClick={createAgreement}
-                                disabled={agreementStatus === "loading" || agreementStatus === "success"}
-                                className={clsx(
-                                    "px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all",
-                                    agreementStatus === "success" ? "bg-green-500/20 text-green-400 cursor-default" :
-                                    agreementStatus === "error" ? "bg-red-500/20 text-red-100 hover:bg-red-500/30" :
-                                    "bg-indigo-600 hover:bg-indigo-500 text-white"
-                                )}
-                            >
-                                {agreementStatus === "loading" ? (
-                                    <RefreshCw className="w-4 h-4 animate-spin" />
-                                ) : agreementStatus === "success" ? (
-                                    <CheckCircle className="w-4 h-4" />
-                                ) : agreementStatus === "error" ? (
-                                    <Lock className="w-4 h-4" />
-                                ) : (
-                                    <Shield className="w-4 h-4" />
-                                )}
-                                
-                                {agreementStatus === "loading" ? "Verifying Holdings..." :
-                                 agreementStatus === "success" ? "Access Granted" :
-                                 agreementStatus === "error" ? "Retry Access" :
-                                 "Initialize Agreement"}
-                            </button>
-
-                            {agreementMessage && (
-                                <motion.div 
-                                    initial={{ opacity: 0, height: 0 }}
-                                    animate={{ opacity: 1, height: "auto" }}
-                                    className={clsx(
-                                        "mt-3 text-xs font-mono p-2 rounded border",
-                                        agreementStatus === "success" ? "bg-green-500/10 border-green-500/20 text-green-400" :
-                                        "bg-red-500/10 border-red-500/20 text-red-400"
-                                    )}
-                                >
-                                    {agreementStatus === "error" && <Lock className="w-3 h-3 inline mr-1" />}
-                                    {agreementMessage}
-                                </motion.div>
-                            )}
-                        </div>
-                        
-                        <div className="w-12 h-12 bg-indigo-500/10 rounded-full flex items-center justify-center border border-indigo-500/20">
-                            <Shield className="w-6 h-6 text-indigo-400" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* On-Chain Escrow - New */}
+              <div className="p-1 rounded-2xl bg-gradient-to-r from-indigo-500/20 via-purple-500/20 to-pink-500/20">
+                <div className="bg-black/90 p-6 rounded-xl backdrop-blur-sm h-full">
+                    <div className="flex items-start justify-between mb-4">
+                        <h3 className="text-lg font-bold text-white">On-Chain Escrow</h3>
+                        <div className="w-10 h-10 bg-indigo-500/10 rounded-full flex items-center justify-center border border-indigo-500/20">
+                            <Lock className="w-5 h-5 text-indigo-400" />
                         </div>
                     </div>
+                    <p className="text-sm text-white/50 mb-4">
+                        Lock TST tokens in a smart contract escrow. Release funds when the deal is complete.
+                    </p>
+                    <button 
+                        onClick={() => router.push("/agreements")}
+                        className="w-full px-4 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white transition-all"
+                    >
+                        <Shield className="w-4 h-4" />
+                        Manage Escrow Agreements
+                    </button>
                 </div>
+              </div>
+              
+              {/* P2P Agreement - Legacy Backend */}
+              <div className="p-1 rounded-2xl bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-red-500/20">
+                <div className="bg-black/90 p-6 rounded-xl backdrop-blur-sm h-full">
+                    <div className="flex items-start justify-between mb-4">
+                        <h3 className="text-lg font-bold text-white">P2P Agreement</h3>
+                        <div className="w-10 h-10 bg-amber-500/10 rounded-full flex items-center justify-center border border-amber-500/20">
+                            <Shield className="w-5 h-5 text-amber-400" />
+                        </div>
+                    </div>
+                    <p className="text-sm text-white/50 mb-4">
+                        Create tracked agreements with counterparties.
+                        <span className="text-amber-400 block mt-1 font-medium">Requires 100 TST Holdings</span>
+                    </p>
+                    
+                    <button 
+                        onClick={createAgreement}
+                        disabled={agreementStatus === "loading" || agreementStatus === "success"}
+                        className={clsx(
+                            "w-full px-4 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all",
+                            agreementStatus === "success" ? "bg-green-500/20 text-green-400 cursor-default" :
+                            agreementStatus === "error" ? "bg-red-500/20 text-red-100 hover:bg-red-500/30" :
+                            "bg-amber-600 hover:bg-amber-500 text-white"
+                        )}
+                    >
+                        {agreementStatus === "loading" ? (
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                        ) : agreementStatus === "success" ? (
+                            <CheckCircle className="w-4 h-4" />
+                        ) : agreementStatus === "error" ? (
+                            <Lock className="w-4 h-4" />
+                        ) : (
+                            <Shield className="w-4 h-4" />
+                        )}
+                        
+                        {agreementStatus === "loading" ? "Verifying Holdings..." :
+                         agreementStatus === "success" ? "Access Granted" :
+                         agreementStatus === "error" ? "Retry Access" :
+                         "Initialize Agreement"}
+                    </button>
+
+                    {agreementMessage && (
+                        <motion.div 
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            className={clsx(
+                                "mt-3 text-xs font-mono p-2 rounded border",
+                                agreementStatus === "success" ? "bg-green-500/10 border-green-500/20 text-green-400" :
+                                "bg-red-500/10 border-red-500/20 text-red-400"
+                            )}
+                        >
+                            {agreementStatus === "error" && <Lock className="w-3 h-3 inline mr-1" />}
+                            {agreementMessage}
+                        </motion.div>
+                    )}
+                </div>
+              </div>
             </div>
 
             {/* Active Agreements List */}

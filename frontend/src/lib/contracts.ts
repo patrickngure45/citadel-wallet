@@ -99,30 +99,40 @@ export const TST_ABI = [
   "event Approval(address indexed owner, address indexed spender, uint256 value)",
 ];
 
-// Escrow Contract ABI
+// TST Escrow Contract ABI (for P2P agreements)
 export const ESCROW_ABI = [
   // Read Functions
-  "function agreements(uint256) view returns (address initiator, address counterparty, address token, uint256 amount, uint8 status, uint256 createdAt)",
+  "function tstToken() view returns (address)",
+  "function admin() view returns (address)",
   "function agreementCount() view returns (uint256)",
-  "function getAgreement(uint256 agreementId) view returns (tuple(address initiator, address counterparty, address token, uint256 amount, uint8 status, uint256 createdAt))",
+  "function agreements(uint256) view returns (address payer, address payee, uint256 amount, string description, uint8 status, uint256 createdAt, uint256 completedAt)",
+  "function getAgreement(uint256 agreementId) view returns (address payer, address payee, uint256 amount, string description, uint8 status, uint256 createdAt, uint256 completedAt)",
+  "function getUserAgreements(address user) view returns (uint256[])",
+  "function getAgreementCount() view returns (uint256)",
   
   // Write Functions
-  "function createAgreement(address counterparty, address token, uint256 amount) returns (uint256)",
-  "function fundAgreement(uint256 agreementId) payable",
-  "function confirmAgreement(uint256 agreementId)",
+  "function createAgreement(address payee, uint256 amount, string description) returns (uint256)",
+  "function depositFunds(uint256 agreementId)",
+  "function createAndFund(address payee, uint256 amount, string description) returns (uint256)",
+  "function releaseFunds(uint256 agreementId)",
+  "function refundFunds(uint256 agreementId)",
   "function cancelAgreement(uint256 agreementId)",
   
   // Events
-  "event AgreementCreated(uint256 indexed agreementId, address indexed initiator, address indexed counterparty, uint256 amount)",
-  "event AgreementFunded(uint256 indexed agreementId, address indexed funder, uint256 amount)",
-  "event AgreementConfirmed(uint256 indexed agreementId)",
+  "event AgreementCreated(uint256 indexed agreementId, address indexed payer, address indexed payee, uint256 amount, string description)",
+  "event FundsDeposited(uint256 indexed agreementId, uint256 amount)",
+  "event FundsReleased(uint256 indexed agreementId, address indexed payee, uint256 amount)",
+  "event FundsRefunded(uint256 indexed agreementId, address indexed payer, uint256 amount)",
   "event AgreementCancelled(uint256 indexed agreementId)",
 ];
 
 // Agreement Status Enum (matches Solidity contract)
 export const AGREEMENT_STATUS = {
-  0: "Pending",
+  0: "Created",
   1: "Funded",
-  2: "Completed",
-  3: "Cancelled",
+  2: "Released",
+  3: "Refunded",
+  4: "Cancelled",
 } as const;
+
+export type AgreementStatusType = keyof typeof AGREEMENT_STATUS;

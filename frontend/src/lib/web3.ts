@@ -251,6 +251,167 @@ export function getPancakeSwapUrl(): string {
   return `${baseUrl}?outputCurrency=${CONTRACTS.TST_TOKEN}`;
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// ESCROW FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════
+
+export interface EscrowAgreement {
+  id: number;
+  payer: string;
+  payee: string;
+  amount: string;
+  description: string;
+  status: number;
+  createdAt: Date;
+  completedAt: Date | null;
+}
+
+/**
+ * Get Escrow contract instance with signer (for write operations)
+ */
+async function getEscrowContractWithSigner(): Promise<Contract | null> {
+  if (!CONTRACTS.ESCROW) {
+    console.warn("Escrow not deployed on", NETWORK.name);
+    return null;
+  }
+  if (!isWalletInstalled()) return null;
+  
+  const provider = new BrowserProvider(window.ethereum);
+  const signer = await provider.getSigner();
+  return new Contract(CONTRACTS.ESCROW, ESCROW_ABI, signer);
+}
+
+/**
+ * Approve escrow contract to spend TST tokens
+ */
+export async function approveEscrow(amount: string): Promise<{ success: boolean; error?: string }> {
+  if (!CONTRACTS.ESCROW) {
+    return { success: false, error: "Escrow not deployed on this network" };
+  }
+  
+  try {
+    const provider = new BrowserProvider(window.ethereum);
+    const signer = await provider.getSigner();
+    const tstContract = new Contract(CONTRACTS.TST_TOKEN, TST_ABI, signer);
+    
+    const amountWei = ethers.parseUnits(amount, 18);
+    const tx = await tstContract.approve(CONTRACTS.ESCROW, amountWei);
+    await tx.wait();
+    
+    return { success: true };
+  } catch (error: any) {
+    console.error("Approve failed:", error);
+    return { success: false, error: error.message || "Approval failed" };
+  }
+}
+
+/**
+ * Create and fund an escrow agreement in one transaction
+ */
+export async function createEscrowAgreement(
+  payeeAddress: string,
+  amount: string,
+  description: string
+): Promise<{ success: boolean; agreementId?: number; txHash?: string; error?: string }> {
+  try {
+    const escrow = await getEscrowContractWithSigner();
+    if (!escrow) {
+      return { success: false, error: "Escrow not available" };
+    }
+    
+    // First approve the escrow to spend tokens
+    const approveResult = await approveEscrow(amount);
+    if (!approveResult.success) {
+      return { success: false, error: approveResult.error };
+    }
+    
+    // Create and fund the agreement
+    const amountWei = ethers.parseUnits(amount, 18);
+    const tx = await escrow.createAndFund(payeeAddress, amountWei, description);
+    const receipt = await tx.wait();
+    
+    // Get agreement ID from event
+    const event = receipt.logs.find((log: any) => {
+      try {
+        const parsed = escrow.interface.parseLog(log);
+        return parsed?.name === "AgreementCreated";
+      } catch { return false; }
+    });
+    
+    let agreementId = 0;
+    if (event) {
+      const parsed = escrow.interface.parseLog(event);
+      agreementId = Number(parsed?.args[0]);
+    }
+    
+    return { success: true, agreementId, txHash: receipt.hash };
+  } catch (error: any) {
+    console.error("Create escrow failed:", error);
+    if (error.code === 4001 || error.code === "ACTION_REJECTED") {
+      return { success: false, error: "Transaction rejected" };
+    }
+    return { success: false, error: error.message || "Failed to create agreement" };
+  }
+}
+
+/**
+ * Release funds from escrow to payee
+ */
+export async function releaseEscrowFunds(
+  agreementId: number
+): Promise<{ success: boolean; txHash?: string; error?: string }> {
+  try {
+    const escrow = await getEscrowContractWithSigner();
+    if (!escrow) {
+      return { success: false, error: "Escrow not available" };
+    }
+    
+    const tx = await escrow.releaseFunds(agreementId);
+    const receipt = await tx.wait();
+    
+    return { success: true, txHash: receipt.hash };
+  } catch (error: any) {
+    console.error("Release failed:", error);
+    return { success: false, error: error.message || "Failed to release funds" };
+  }
+}
+
+/**
+ * Get user's escrow agreements
+ */
+export async function getUserEscrowAgreements(userAddress: string): Promise<EscrowAgreement[]> {
+  if (!CONTRACTS.ESCROW) return [];
+  
+  try {
+    const provider = getReadOnlyProvider();
+    const escrow = new Contract(CONTRACTS.ESCROW, ESCROW_ABI, provider);
+    
+    const agreementIds = await escrow.getUserAgreements(userAddress);
+    const agreements: EscrowAgreement[] = [];
+    
+    for (const id of agreementIds) {
+      const [payer, payee, amount, description, status, createdAt, completedAt] = 
+        await escrow.getAgreement(id);
+      
+      agreements.push({
+        id: Number(id),
+        payer,
+        payee,
+        amount: formatUnits(amount, 18),
+        description,
+        status: Number(status),
+        createdAt: new Date(Number(createdAt) * 1000),
+        completedAt: completedAt > 0 ? new Date(Number(completedAt) * 1000) : null,
+      });
+    }
+    
+    return agreements;
+  } catch (error) {
+    console.error("Failed to fetch agreements:", error);
+    return [];
+  }
+}
+
 /**
  * Shorten address for display
  * 0x1234...5678
