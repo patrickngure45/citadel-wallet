@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { motion } from "framer-motion";
-import { Wallet, ArrowUpRight, ArrowDownLeft, RefreshCw, LogOut, Shield, Lock, CheckCircle, XCircle, ExternalLink, Coins, Send, X, ShoppingCart } from "lucide-react";
+import { Wallet, ArrowUpRight, ArrowDownLeft, RefreshCw, LogOut, Shield, Lock, CheckCircle, XCircle, ExternalLink, Coins, Send, X, ShoppingCart, History, Clock } from "lucide-react";
 import clsx from "clsx";
 import { WalletConnect } from "@/components/WalletConnect";
 import { useWeb3 } from "@/hooks/useWeb3";
@@ -53,6 +53,15 @@ interface Agreement {
   created_at: string;
 }
 
+interface TxHistory {
+  hash: string;
+  from: string;
+  to: string;
+  value: string;
+  timeStamp: string;
+  type: "in" | "out";
+}
+
 export default function Dashboard() {
   const router = useRouter();
   const [balances, setBalances] = useState<BalanceData[]>([]);
@@ -80,7 +89,57 @@ export default function Dashboard() {
   const [transferAmount, setTransferAmount] = useState("");
   const [transferStatus, setTransferStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [transferMessage, setTransferMessage] = useState("");
+  
+  // Transaction History State
+  const [txHistory, setTxHistory] = useState<TxHistory[]>([]);
+  const [loadingTx, setLoadingTx] = useState(false);
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+
+  // Fetch transaction history when wallet connects
+  useEffect(() => {
+    if (walletAddress) {
+      fetchTxHistory(walletAddress);
+    }
+  }, [walletAddress]);
+
+  const fetchTxHistory = async (address: string) => {
+    setLoadingTx(true);
+    try {
+      // Use BscScan API to get token transfers
+      const apiKey = "YourApiKeyToken"; // Free tier works without key
+      const baseUrl = NETWORK.chainId === 56 
+        ? "https://api.bscscan.com/api"
+        : "https://api-testnet.bscscan.com/api";
+      
+      const response = await axios.get(baseUrl, {
+        params: {
+          module: "account",
+          action: "tokentx",
+          contractaddress: CONTRACTS.TST_TOKEN,
+          address: address,
+          page: 1,
+          offset: 10,
+          sort: "desc",
+        }
+      });
+
+      if (response.data.status === "1" && response.data.result) {
+        const txs: TxHistory[] = response.data.result.map((tx: any) => ({
+          hash: tx.hash,
+          from: tx.from,
+          to: tx.to,
+          value: tx.value,
+          timeStamp: tx.timeStamp,
+          type: tx.to.toLowerCase() === address.toLowerCase() ? "in" : "out",
+        }));
+        setTxHistory(txs);
+      }
+    } catch (error) {
+      console.error("Failed to fetch tx history:", error);
+    } finally {
+      setLoadingTx(false);
+    }
+  };
 
   useEffect(() => {
     // In a real app, this would come from a secure session/cookie
@@ -265,8 +324,19 @@ export default function Dashboard() {
                   </div>
                 </div>
                 
-                <div className="text-xs text-white/30 font-mono mb-3 truncate">
+                <div className="text-xs text-white/30 font-mono mb-2 truncate">
                   {CONTRACTS.TST_TOKEN}
+                </div>
+                
+                {/* Gas Balance */}
+                <div className="flex items-center justify-between text-xs mb-3 px-2 py-1.5 bg-black/30 rounded-lg">
+                  <span className="text-white/40">Gas (BNB):</span>
+                  <span className={clsx(
+                    "font-mono",
+                    parseFloat(bnbBalance || "0") < 0.001 ? "text-red-400" : "text-green-400"
+                  )}>
+                    {parseFloat(bnbBalance || "0").toFixed(4)} BNB
+                  </span>
                 </div>
                 
                 {/* Action Buttons */}
@@ -344,6 +414,92 @@ export default function Dashboard() {
                 ))
             )}
         </div>
+
+        {/* Transaction History */}
+        {isConnected && (
+          <section>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <History className="w-5 h-5 text-amber-400" />
+                <h2 className="text-xl font-bold text-white">Recent TST Transfers</h2>
+              </div>
+              {walletAddress && (
+                <button 
+                  onClick={() => fetchTxHistory(walletAddress)}
+                  className="p-2 hover:bg-white/5 rounded-lg transition-colors"
+                >
+                  <RefreshCw className={clsx("w-4 h-4 text-white/50", loadingTx && "animate-spin")} />
+                </button>
+              )}
+            </div>
+
+            {loadingTx ? (
+              <div className="space-y-3">
+                {[1,2,3].map(i => (
+                  <div key={i} className="h-16 rounded-xl bg-white/5 animate-pulse" />
+                ))}
+              </div>
+            ) : txHistory.length > 0 ? (
+              <div className="space-y-2">
+                {txHistory.map((tx) => {
+                  const amount = parseFloat(tx.value) / 1e18;
+                  const date = new Date(parseInt(tx.timeStamp) * 1000);
+                  const isIncoming = tx.type === "in";
+                  
+                  return (
+                    <motion.a
+                      key={tx.hash}
+                      href={`${NETWORK.explorer}/tx/${tx.hash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10 hover:border-white/20 transition-all cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={clsx(
+                          "w-10 h-10 rounded-full flex items-center justify-center",
+                          isIncoming ? "bg-green-500/20" : "bg-red-500/20"
+                        )}>
+                          {isIncoming ? (
+                            <ArrowDownLeft className="w-5 h-5 text-green-400" />
+                          ) : (
+                            <ArrowUpRight className="w-5 h-5 text-red-400" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-medium text-white text-sm">
+                            {isIncoming ? "Received" : "Sent"}
+                          </p>
+                          <p className="text-xs text-white/40 font-mono">
+                            {isIncoming ? `From: ${tx.from.slice(0,6)}...${tx.from.slice(-4)}` : `To: ${tx.to.slice(0,6)}...${tx.to.slice(-4)}`}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className={clsx(
+                          "font-bold font-mono text-sm",
+                          isIncoming ? "text-green-400" : "text-red-400"
+                        )}>
+                          {isIncoming ? "+" : "-"}{formatLargeNumber(amount)} TST
+                        </p>
+                        <div className="flex items-center gap-1 text-xs text-white/40">
+                          <Clock className="w-3 h-3" />
+                          {date.toLocaleDateString()} {date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        </div>
+                      </div>
+                    </motion.a>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-white/40">
+                <History className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                <p>No TST transfers yet</p>
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Premium Services / TST Gate */}
         <section>
