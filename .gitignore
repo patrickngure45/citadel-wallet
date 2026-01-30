@@ -60,3 +60,5 @@ secret_*
 tmp/
 temp/
 *.tmp
+
+/generated/prisma
