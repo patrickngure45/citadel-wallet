@@ -10,6 +10,31 @@ import { WalletConnect } from "@/components/WalletConnect";
 import { useWeb3 } from "@/hooks/useWeb3";
 import { NETWORK, CONTRACTS } from "@/lib/contracts";
 
+// Format large numbers with suffixes (K, M, B, T, Q for quadrillion, etc.)
+function formatLargeNumber(num: number): string {
+  if (num === 0) return "0";
+  
+  const suffixes = [
+    { value: 1e18, symbol: "Qi" },  // Quintillion
+    { value: 1e15, symbol: "Q" },   // Quadrillion
+    { value: 1e12, symbol: "T" },   // Trillion
+    { value: 1e9, symbol: "B" },    // Billion
+    { value: 1e6, symbol: "M" },    // Million
+    { value: 1e3, symbol: "K" },    // Thousand
+  ];
+  
+  for (const suffix of suffixes) {
+    if (num >= suffix.value) {
+      const formatted = (num / suffix.value).toFixed(2);
+      // Remove trailing zeros
+      return parseFloat(formatted).toString() + suffix.symbol;
+    }
+  }
+  
+  // For numbers < 1000, show up to 4 decimal places
+  return num.toLocaleString(undefined, { maximumFractionDigits: 4 });
+}
+
 interface BalanceData {
   chain: string;
   address: string;
@@ -170,21 +195,21 @@ export default function Dashboard() {
               <motion.div 
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="p-6 rounded-2xl bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/30 hover:border-amber-500/50 transition-all group"
+                className="p-6 rounded-2xl bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/30 hover:border-amber-500/50 transition-all group overflow-hidden"
               >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
+                <div className="flex items-start justify-between mb-4 gap-2">
+                  <div className="flex items-center gap-3 flex-shrink-0">
                     <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
                       <Coins className="w-5 h-5 text-amber-400" />
                     </div>
                     <div>
                       <h3 className="font-semibold text-amber-400">TST Token</h3>
-                      <p className="text-xs text-white/40">BSC Testnet</p>
+                      <p className="text-xs text-white/40">{NETWORK.name}</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-lg font-bold font-mono text-white">
-                      {tstBalance ? parseFloat(tstBalance.formatted).toLocaleString() : "0"}
+                  <div className="text-right min-w-0 flex-shrink">
+                    <p className="text-lg font-bold font-mono text-white truncate" title={tstBalance?.formatted || "0"}>
+                      {tstBalance ? formatLargeNumber(parseFloat(tstBalance.formatted)) : "0"}
                     </p>
                     <p className="text-xs text-amber-400">TST</p>
                   </div>
