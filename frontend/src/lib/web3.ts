@@ -197,6 +197,61 @@ export async function addTSTToWallet(): Promise<boolean> {
 }
 
 /**
+ * Transfer TST tokens to another address
+ * Requires connected wallet
+ */
+export async function transferTST(
+  toAddress: string,
+  amount: string
+): Promise<{ success: boolean; txHash?: string; error?: string }> {
+  if (!isWalletInstalled()) {
+    return { success: false, error: "Wallet not installed" };
+  }
+
+  try {
+    const provider = new BrowserProvider(window.ethereum);
+    const signer = await provider.getSigner();
+    
+    // Create contract instance with signer (for write operations)
+    const contract = new Contract(CONTRACTS.TST_TOKEN, TST_ABI, signer);
+    
+    // Convert amount to wei (18 decimals)
+    const amountWei = ethers.parseUnits(amount, 18);
+    
+    // Send transaction
+    const tx = await contract.transfer(toAddress, amountWei);
+    
+    // Wait for confirmation
+    const receipt = await tx.wait();
+    
+    return { success: true, txHash: receipt.hash };
+  } catch (error: any) {
+    console.error("Transfer failed:", error);
+    
+    if (error.code === 4001 || error.code === "ACTION_REJECTED") {
+      return { success: false, error: "Transaction rejected by user" };
+    }
+    if (error.message?.includes("insufficient")) {
+      return { success: false, error: "Insufficient balance" };
+    }
+    
+    return { success: false, error: error.message || "Transfer failed" };
+  }
+}
+
+/**
+ * Get PancakeSwap URL for TST token
+ */
+export function getPancakeSwapUrl(): string {
+  // PancakeSwap URL for the token on mainnet or testnet
+  const baseUrl = USE_MAINNET 
+    ? "https://pancakeswap.finance/swap"
+    : "https://pancakeswap.finance/swap"; // Same URL, it auto-detects network
+  
+  return `${baseUrl}?outputCurrency=${CONTRACTS.TST_TOKEN}`;
+}
+
+/**
  * Shorten address for display
  * 0x1234...5678
  */

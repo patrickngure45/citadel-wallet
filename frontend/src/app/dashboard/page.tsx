@@ -4,11 +4,12 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { motion } from "framer-motion";
-import { Wallet, ArrowUpRight, ArrowDownLeft, RefreshCw, LogOut, Shield, Lock, CheckCircle, XCircle, ExternalLink, Coins } from "lucide-react";
+import { Wallet, ArrowUpRight, ArrowDownLeft, RefreshCw, LogOut, Shield, Lock, CheckCircle, XCircle, ExternalLink, Coins, Send, X, ShoppingCart } from "lucide-react";
 import clsx from "clsx";
 import { WalletConnect } from "@/components/WalletConnect";
 import { useWeb3 } from "@/hooks/useWeb3";
 import { NETWORK, CONTRACTS } from "@/lib/contracts";
+import { transferTST, getPancakeSwapUrl } from "@/lib/web3";
 
 // Format large numbers with suffixes (K, M, B, T, Q for quadrillion, etc.)
 function formatLargeNumber(num: number): string {
@@ -72,6 +73,13 @@ export default function Dashboard() {
   // Agreement State
   const [agreementStatus, setAgreementStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [agreementMessage, setAgreementMessage] = useState("");
+  
+  // Transfer Modal State
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferTo, setTransferTo] = useState("");
+  const [transferAmount, setTransferAmount] = useState("");
+  const [transferStatus, setTransferStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [transferMessage, setTransferMessage] = useState("");
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
   useEffect(() => {
@@ -135,6 +143,48 @@ export default function Dashboard() {
   const handleLogout = () => {
     localStorage.removeItem("citadel_user_id");
     router.push("/");
+  };
+
+  const handleTransfer = async () => {
+    if (!transferTo || !transferAmount) {
+      setTransferMessage("Please fill in all fields");
+      setTransferStatus("error");
+      return;
+    }
+
+    // Validate address
+    if (!/^0x[a-fA-F0-9]{40}$/.test(transferTo)) {
+      setTransferMessage("Invalid wallet address");
+      setTransferStatus("error");
+      return;
+    }
+
+    // Validate amount
+    const amount = parseFloat(transferAmount);
+    if (isNaN(amount) || amount <= 0) {
+      setTransferMessage("Invalid amount");
+      setTransferStatus("error");
+      return;
+    }
+
+    setTransferStatus("loading");
+    setTransferMessage("");
+
+    const result = await transferTST(transferTo, transferAmount);
+
+    if (result.success) {
+      setTransferStatus("success");
+      setTransferMessage(`Sent! TX: ${result.txHash?.slice(0, 10)}...`);
+      setTransferTo("");
+      setTransferAmount("");
+      // Refresh balance after 3 seconds
+      setTimeout(() => {
+        window.location.reload();
+      }, 3000);
+    } else {
+      setTransferStatus("error");
+      setTransferMessage(result.error || "Transfer failed");
+    }
   };
 
   const getTotalValue = () => {
@@ -219,11 +269,29 @@ export default function Dashboard() {
                   {CONTRACTS.TST_TOKEN}
                 </div>
                 
+                {/* Action Buttons */}
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  <button
+                    onClick={() => setShowTransferModal(true)}
+                    className="flex items-center justify-center gap-1 py-2 bg-amber-500/20 hover:bg-amber-500/30 rounded-lg text-xs font-medium text-amber-400 transition-colors"
+                  >
+                    <Send className="w-3 h-3" /> Send
+                  </button>
+                  <a 
+                    href={getPancakeSwapUrl()}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-1 py-2 bg-green-500/20 hover:bg-green-500/30 rounded-lg text-xs font-medium text-green-400 transition-colors"
+                  >
+                    <ShoppingCart className="w-3 h-3" /> Trade
+                  </a>
+                </div>
+                
                 <a 
                   href={`${NETWORK.explorer}/token/${CONTRACTS.TST_TOKEN}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-1 py-2 bg-amber-500/10 hover:bg-amber-500/20 rounded-lg text-xs font-medium text-amber-400 transition-colors"
+                  className="flex items-center justify-center gap-1 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-xs font-medium text-white/60 transition-colors"
                 >
                   <ExternalLink className="w-3 h-3" /> View on Explorer
                 </a>
@@ -382,6 +450,100 @@ export default function Dashboard() {
         </section>
 
       </main>
+
+      {/* Transfer Modal */}
+      {showTransferModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-gray-900 border border-white/10 rounded-2xl p-6 w-full max-w-md"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white">Send TST Tokens</h2>
+              <button 
+                onClick={() => {
+                  setShowTransferModal(false);
+                  setTransferStatus("idle");
+                  setTransferMessage("");
+                }}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-white/60" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-white/60 mb-2">Recipient Address</label>
+                <input
+                  type="text"
+                  value={transferTo}
+                  onChange={(e) => setTransferTo(e.target.value)}
+                  placeholder="0x..."
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:border-amber-500/50 font-mono text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-white/60 mb-2">Amount (TST)</label>
+                <input
+                  type="number"
+                  value={transferAmount}
+                  onChange={(e) => setTransferAmount(e.target.value)}
+                  placeholder="0.00"
+                  step="any"
+                  min="0"
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:border-amber-500/50 font-mono"
+                />
+                {tstBalance && (
+                  <p className="text-xs text-white/40 mt-1">
+                    Balance: {formatLargeNumber(parseFloat(tstBalance.formatted))} TST
+                  </p>
+                )}
+              </div>
+
+              {transferMessage && (
+                <div className={clsx(
+                  "p-3 rounded-lg text-sm",
+                  transferStatus === "success" ? "bg-green-500/20 text-green-400" :
+                  transferStatus === "error" ? "bg-red-500/20 text-red-400" :
+                  "bg-white/5 text-white/60"
+                )}>
+                  {transferMessage}
+                </div>
+              )}
+
+              <button
+                onClick={handleTransfer}
+                disabled={transferStatus === "loading"}
+                className={clsx(
+                  "w-full py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all",
+                  transferStatus === "loading" 
+                    ? "bg-amber-500/20 text-amber-400 cursor-not-allowed"
+                    : "bg-amber-500 hover:bg-amber-600 text-black"
+                )}
+              >
+                {transferStatus === "loading" ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    Send TST
+                  </>
+                )}
+              </button>
+
+              <p className="text-xs text-center text-white/30">
+                Transaction will be sent on {NETWORK.name}
+              </p>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
