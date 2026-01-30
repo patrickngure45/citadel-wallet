@@ -12,6 +12,8 @@ class WalletService:
         self.w3_eth = Web3(Web3.HTTPProvider(settings.ETHEREUM_RPC_URL))
         self.w3_bsc = Web3(Web3.HTTPProvider(settings.BSC_RPC_URL))
         self.w3_poly = Web3(Web3.HTTPProvider(settings.POLYGON_RPC_URL))
+        # BSC Testnet for development
+        self.w3_bsc_testnet = Web3(Web3.HTTPProvider("https://data-seed-prebsc-1-s1.binance.org:8545/"))
 
     def generate_evm_address(self, index: int) -> dict:
         """
@@ -66,6 +68,8 @@ class WalletService:
                 w3 = self.w3_poly
             elif chain.lower() == "bsc":
                 w3 = self.w3_bsc
+            elif chain.lower() == "bsc_testnet":
+                w3 = self.w3_bsc_testnet
             else:
                 return 0.0
             

@@ -1,8 +1,19 @@
+import os
 from app.services.wallet_service import wallet_service
 
-# Configuration
-TST_CONTRACT_ADDRESS = "0x4B3ff00Bd27a9d75204CceB619d5B1D393dbaE71"
-TST_CHAIN = "bsc"
+# Configuration - Network Toggle
+USE_MAINNET = os.getenv("USE_MAINNET", "false").lower() == "true"
+
+# Contract addresses per network
+if USE_MAINNET:
+    TST_CONTRACT_ADDRESS = "0x4B3ff00Bd27a9d75204CceB619d5B1D393dbaE71"  # Mainnet TST
+    TST_CHAIN = "bsc"
+else:
+    TST_CONTRACT_ADDRESS = "0x297aB5E3Cd7798cC5cA75F30fa06e695F4E954f5"  # Testnet TST
+    TST_CHAIN = "bsc_testnet"
+
+print(f"[AccessControl] Network: {'MAINNET' if USE_MAINNET else 'TESTNET'}")
+print(f"[AccessControl] TST Contract: {TST_CONTRACT_ADDRESS}")
 
 # Debug / Phase 0 Bypass
 # Since TST is currently untransferable due to contract issues, we allow 
@@ -10,6 +21,7 @@ TST_CHAIN = "bsc"
 MOCK_BYPASS_ADDRESSES = [
     "0x578E5057088b9F65B20327f33A0360a0E06d5Da6", # External Test User
     "0x578FC7311a846997dc99bF2d4C651418DcFe309A", # Custodial User (Index 1)
+    "0x571E52efc50055d760CEaE2446aE3B469a806279", # Deployer/Master Wallet
 ]
 
 class AccessControlService:

@@ -4,8 +4,11 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { motion } from "framer-motion";
-import { Wallet, ArrowUpRight, ArrowDownLeft, RefreshCw, LogOut, Shield, Lock, CheckCircle, XCircle } from "lucide-react";
+import { Wallet, ArrowUpRight, ArrowDownLeft, RefreshCw, LogOut, Shield, Lock, CheckCircle, XCircle, ExternalLink, Coins } from "lucide-react";
 import clsx from "clsx";
+import { WalletConnect } from "@/components/WalletConnect";
+import { useWeb3 } from "@/hooks/useWeb3";
+import { NETWORK, CONTRACTS } from "@/lib/contracts";
 
 interface BalanceData {
   chain: string;
@@ -30,6 +33,16 @@ export default function Dashboard() {
   const [agreements, setAgreements] = useState<Agreement[]>([]);
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
+  
+  // Web3 Hook for blockchain interactions
+  const { 
+    isConnected, 
+    tstBalance, 
+    bnbBalance, 
+    address: walletAddress,
+    shortenedAddress,
+    explorerUrl,
+  } = useWeb3();
   
   // Agreement State
   const [agreementStatus, setAgreementStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
@@ -126,7 +139,9 @@ export default function Dashboard() {
               <span className="font-bold tracking-tight">Citadel</span>
             </div>
             <div className="flex items-center gap-4">
-              <button onClick={() => fetchBalances(userId)} className="p-2 hover:bg-white/5 rounded-full transition-colors">
+              {/* Web3 Wallet Connect */}
+              <WalletConnect />
+              <button onClick={() => fetchBalances(userId!)} className="p-2 hover:bg-white/5 rounded-full transition-colors">
                 <RefreshCw className={clsx("w-4 h-4 text-white/50", loading && "animate-spin")} />
               </button>
               <button onClick={handleLogout} className="p-2 hover:bg-white/5 rounded-full transition-colors text-red-400">
@@ -149,6 +164,48 @@ export default function Dashboard() {
 
         {/* Assets Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            
+            {/* TST Token Card - Real Blockchain Data */}
+            {isConnected && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-6 rounded-2xl bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/30 hover:border-amber-500/50 transition-all group"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+                      <Coins className="w-5 h-5 text-amber-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-amber-400">TST Token</h3>
+                      <p className="text-xs text-white/40">BSC Testnet</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-lg font-bold font-mono text-white">
+                      {tstBalance ? parseFloat(tstBalance.formatted).toLocaleString() : "0"}
+                    </p>
+                    <p className="text-xs text-amber-400">TST</p>
+                  </div>
+                </div>
+                
+                <div className="text-xs text-white/30 font-mono mb-3 truncate">
+                  {CONTRACTS.TST_TOKEN}
+                </div>
+                
+                <a 
+                  href={`${NETWORK.explorer}/token/${CONTRACTS.TST_TOKEN}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-1 py-2 bg-amber-500/10 hover:bg-amber-500/20 rounded-lg text-xs font-medium text-amber-400 transition-colors"
+                >
+                  <ExternalLink className="w-3 h-3" /> View on Explorer
+                </a>
+              </motion.div>
+            )}
+            
+            {/* Existing balance cards */}
             {balances.map((asset) => (
                 <motion.div 
                     key={asset.chain}
