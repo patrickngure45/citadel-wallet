@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://user:password@localhost/citadel"
 
+    @field_validator("DATABASE_URL", mode="before")
+    def assemble_db_connection(cls, v: Union[str, None]) -> Any:
+        if isinstance(v, str) and v.startswith("postgresql://"):
+            return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return v
+
     # Security
     SECRET_KEY: str = "CHANGE_THIS_TO_A_SECURE_SECRET"
     ALGORITHM: str = "HS256"
