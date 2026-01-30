@@ -44,8 +44,8 @@ const CONTRACT_ADDRESSES = {
     // Your EXISTING mainnet TST token (TradeSynapse Token)
     TST_TOKEN: "0x4B3ff00Bd27a9d75204CceB619d5B1D393dbaE71",
     TST_ORACLE: "0x297aB5E3Cd7798cC5cA75F30fa06e695F4E954f5",
-    // Escrow not yet deployed on mainnet
-    ESCROW: null as string | null,
+    // TSTEscrow contract on mainnet
+    ESCROW: "0x922bA3bD7866F92F0Caa2A544bb303A38922fb12",
   },
   testnet: {
     // Testnet deployments (for development)

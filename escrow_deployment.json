@@ -1,0 +1,10 @@
+{
+  "network": "BSC Mainnet",
+  "chainId": 56,
+  "escrowAddress": "0x922bA3bD7866F92F0Caa2A544bb303A38922fb12",
+  "tstTokenAddress": "0x4B3ff00Bd27a9d75204CceB619d5B1D393dbaE71",
+  "deployerAddress": "0x571E52efc50055d760CEaE2446aE3B469a806279",
+  "txHash": "40f01730afb480bdb941944f2e4923fad98be545716ea241d541a016a3c59f92",
+  "blockNumber": 78337847,
+  "gasUsed": 2572371
+}
