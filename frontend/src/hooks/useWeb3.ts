@@ -60,6 +60,27 @@ export function useWeb3(): UseWeb3Return {
   const isConnected = !!address;
   const isCorrectNetwork = chainId === NETWORK.chainId;
 
+  // Check if already connected on mount
+  useEffect(() => {
+    const checkExistingConnection = async () => {
+      if (!isWalletInstalled()) return;
+      
+      try {
+        // Check if already authorized (doesn't prompt user)
+        const accounts = await window.ethereum.request({ method: "eth_accounts" });
+        if (accounts && accounts.length > 0) {
+          setAddress(accounts[0]);
+          const chainIdHex = await window.ethereum.request({ method: "eth_chainId" });
+          setChainId(parseInt(chainIdHex, 16));
+        }
+      } catch (error) {
+        console.error("Error checking existing connection:", error);
+      }
+    };
+    
+    checkExistingConnection();
+  }, []);
+
   // Fetch balances
   const refreshBalances = useCallback(async () => {
     if (!address) return;

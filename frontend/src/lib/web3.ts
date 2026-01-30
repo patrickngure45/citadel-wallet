@@ -96,7 +96,7 @@ export function isWalletInstalled(): boolean {
 
 /**
  * Connect to user's wallet (MetaMask, etc.)
- * Returns the connected address
+ * Returns the connected address with timeout protection
  */
 export async function connectWallet(): Promise<string | null> {
   if (!isWalletInstalled()) {
@@ -105,11 +105,27 @@ export async function connectWallet(): Promise<string | null> {
   }
 
   try {
-    const provider = new BrowserProvider(window.ethereum);
-    const accounts = await provider.send("eth_requestAccounts", []);
+    // Create a timeout promise
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error("Connection timeout - please check MetaMask")), 30000);
+    });
+
+    // Race between connection and timeout
+    const accounts = await Promise.race([
+      window.ethereum.request({ method: "eth_requestAccounts" }),
+      timeoutPromise,
+    ]) as string[];
+    
     return accounts[0] || null;
-  } catch (error) {
-    console.error("Failed to connect wallet:", error);
+  } catch (error: any) {
+    if (error.message?.includes("timeout")) {
+      alert("Connection timed out. Please open MetaMask and try again.");
+    } else if (error.code === 4001) {
+      // User rejected the request
+      console.log("User rejected connection");
+    } else {
+      console.error("Failed to connect wallet:", error);
+    }
     return null;
   }
 }
