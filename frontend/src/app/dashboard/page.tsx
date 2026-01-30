@@ -273,6 +273,14 @@ export default function Dashboard() {
               <span className="font-bold tracking-tight">Citadel</span>
             </div>
             <div className="flex items-center gap-4">
+              <button 
+                  onClick={() => router.push('/hearing')} 
+                  className="hidden md:flex items-center gap-2 text-sm font-medium text-indigo-300 hover:text-white transition-colors bg-indigo-500/10 hover:bg-indigo-500/20 px-3 py-1.5 rounded-full border border-indigo-500/20"
+              >
+                 <span>Entity Room</span>
+                 <ExternalLink size={14} />
+              </button>
+
               {/* Web3 Wallet Connect */}
               <WalletConnect />
               <button onClick={() => fetchBalances(userId!)} className="p-2 hover:bg-white/5 rounded-full transition-colors">
