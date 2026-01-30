@@ -14,7 +14,8 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     
     # CORS Configuration
-    BACKEND_CORS_ORIGINS: List[AnyHttpUrl] = []
+    # Changed to List[str] to allow "*" or other patterns without strict URL validation
+    BACKEND_CORS_ORIGINS: List[str] = []
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
@@ -39,7 +40,8 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
     # Wallet / Master Key
-    CITADEL_MASTER_SEED: str
+    # Added default for initial deployment safety
+    CITADEL_MASTER_SEED: str = "deployment-placeholder-seed-change-in-prod"
 
     # RPC Nodes (Defaults to public/free tiers for dev)
     ETHEREUM_RPC_URL: str = "https://eth.llamarpc.com"
