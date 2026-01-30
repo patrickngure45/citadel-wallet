@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0b0d14;
+  --foreground: #e0e7ff;
+  --card: #151923;
+  --primary: #6366f1; /* Indigo 500 */
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), sans-serif;
+  overflow-x: hidden;
+}
+
