@@ -121,7 +121,7 @@ async def update_cex_config(
     except ValueError:
          raise HTTPException(status_code=400, detail="Invalid User ID format")
 
-@router.post("/", response_model=UserResponse)
+@router.post("", response_model=UserResponse)
 async def create_user(
     *,
     db: AsyncSession = Depends(get_db),

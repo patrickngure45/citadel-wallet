@@ -35,7 +35,7 @@ export default function Home() {
     setError("");
 
     try {
-      const res = await axios.post<UserResponse>(`${API_URL}/users/`, {
+      const res = await axios.post<UserResponse>(`${API_URL}/users`, {
         email: formData.email,
         name: formData.name,
       });
