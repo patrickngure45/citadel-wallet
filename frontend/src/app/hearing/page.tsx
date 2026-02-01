@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import axios from "axios";
 import { ArrowRight, ShieldAlert, CheckCircle, XCircle, BrainCircuit, Activity, Eye, Zap } from "lucide-react";
 import { HearingRecord } from "@/lib/hearing";
@@ -9,7 +9,7 @@ import { useEffect } from "react";
 
 const API_URL = "/api/v1";
 
-export default function HearingPage() {
+function HearingContent() {
   const searchParams = useSearchParams();
   const [intent, setIntent] = useState("");
   const [loading, setLoading] = useState(false);
@@ -292,6 +292,21 @@ export default function HearingPage() {
       </main>
       </div>
     </div>
+  );
+}
+
+export default function HearingPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#0b0d14] flex items-center justify-center">
+        <div className="animate-pulse flex flex-col items-center gap-4">
+          <div className="w-12 h-12 rounded-full border-4 border-indigo-500/30 border-t-indigo-500 animate-spin" />
+          <div className="text-indigo-400 font-mono text-sm tracking-widest">INITIALIZING AUDIT PLANE...</div>
+        </div>
+      </div>
+    }>
+      <HearingContent />
+    </Suspense>
   );
 }
 
