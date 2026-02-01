@@ -22,6 +22,7 @@ class AgreementResponse(AgreementBase):
     creator_id: UUID
     counterparty_id: Optional[UUID]
     status: str
+    contract_address: Optional[str] = None
     created_at: datetime
     
     class Config:

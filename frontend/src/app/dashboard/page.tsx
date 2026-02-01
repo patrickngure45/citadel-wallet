@@ -60,6 +60,7 @@ interface Agreement {
   amount: number;
   status: string;
   created_at: string;
+  contract_address?: string;
 }
 
 interface TxHistory {
