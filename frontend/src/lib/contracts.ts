@@ -45,7 +45,7 @@ const CONTRACT_ADDRESSES = {
     TST_TOKEN: "0x4B3ff00Bd27a9d75204CceB619d5B1D393dbaE71",
     TST_ORACLE: "0x297aB5E3Cd7798cC5cA75F30fa06e695F4E954f5",
     // TSTEscrow contract on mainnet
-    ESCROW: null as string | null, // Native BNB Escrow (Not deployed on Mainnet yet)
+    ESCROW: "0xEd6C769f17d6462A5DB87395a9Ae30A274afAE49", // Native BNB Escrow
     TST_ESCROW: "0x922bA3bD7866F92F0Caa2A544bb303A38922fb12", 
   },
   testnet: {
