@@ -5,6 +5,10 @@ from app.core.config import settings
 class WalletService:
     def __init__(self):
         self.master_mnemonic = settings.CITADEL_MASTER_SEED
+        # Ensure we strip any accidental quotes from the environment variable
+        if self.master_mnemonic:
+            self.master_mnemonic = self.master_mnemonic.strip('"').strip("'")
+            
         # Enable Mnemonic features
         Account.enable_unaudited_hdwallet_features()
         

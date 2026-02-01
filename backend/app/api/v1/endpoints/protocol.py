@@ -1,9 +1,41 @@
-from typing import Any, Dict
-from fastapi import APIRouter
+from typing import Any, Dict, List
+from datetime import datetime
+from fastapi import APIRouter, BackgroundTasks
 from app.services.wallet_service import wallet_service
+from app.services.sweeper_service import sweeper_service
 from app.core.config import settings
 
 router = APIRouter()
+
+# Global In-Memory State for MVP Autopilot Control
+AUTOPILOT_STATE = {
+    "enabled": False,
+    "last_run": None,
+    "status": "IDLE"
+}
+
+@router.get("/autopilot", response_model=Dict[str, Any])
+def get_autopilot_status() -> Any:
+    return AUTOPILOT_STATE
+
+@router.post("/autopilot/toggle", response_model=Dict[str, Any])
+def toggle_autopilot(enable: bool) -> Any:
+    AUTOPILOT_STATE["enabled"] = enable
+    AUTOPILOT_STATE["status"] = "RACING" if enable else "IDLE"
+    return AUTOPILOT_STATE
+
+@router.post("/autopilot/run")
+async def run_autopilot_cycle(background_tasks: BackgroundTasks) -> Dict[str, str]:
+    """
+    Manually trigger a single sweep cycle.
+    Useful for testing or cron-job hooks.
+    """
+    if not AUTOPILOT_STATE["enabled"]:
+        return {"status": "Ignored (Autopilot Disabled)"}
+        
+    background_tasks.add_task(sweeper_service.run_sweep_cycle)
+    AUTOPILOT_STATE["last_run"] = str(datetime.now()) # crude timestamp
+    return {"status": "Autopilot Cycle Initiated"}
 
 @router.get("/stats", response_model=Dict[str, Any])
 async def get_protocol_stats() -> Any:

@@ -609,9 +609,14 @@ class ExecutionEntity(BaseEntity):
             )
 
         except Exception as e:
+            error_msg = str(e)
+            # SECURITY: Sanitize potential seed leaks
+            if "Language not detected" in error_msg:
+                 error_msg = "Security Alert: Invalid Mnemonic Phrase Configuration. Please check CITADEL_MASTER_SEED."
+            
             record.execution = ExecutionResult(
                 status="FAILED",
-                logs=[str(e)],
+                logs=[error_msg],
                 tx_hash=None,
                 broadcast_time=None
             )

@@ -18,7 +18,7 @@ async def list_users():
             idx = u.derivation_index if u.derivation_index is not None else -1
             wallet = wallet_service.generate_evm_address(idx)
             addr = wallet["address"]
-            print(f"{u.email:<35} | {idx:<5} | {addr}")
+            print(f"{u.id} | {u.email:<35} | {idx:<5} | {addr}")
 
 if __name__ == "__main__":
     if sys.platform == 'win32':
