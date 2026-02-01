@@ -25,6 +25,10 @@ origins = [
 # Add any others from settings
 if settings.BACKEND_CORS_ORIGINS:
     for origin in settings.BACKEND_CORS_ORIGINS:
+        # Check if the origin is a wildcard "*"
+        if origin == "*":
+            origins = ["*"]
+            break
         origin_str = str(origin).strip("/")
         if origin_str not in origins:
             origins.append(origin_str)
@@ -33,7 +37,7 @@ print(f"✅ CORS Origins Configured: {origins}")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins, 
+    allow_origins=origins,  # If ["*"], allows all
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
