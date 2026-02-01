@@ -7,10 +7,119 @@ from sqlalchemy.orm import selectinload
 from app.db.session import get_db
 from app.models.user import User
 from app.models.wallet import Wallet
-from app.schemas.user import UserCreate, UserResponse
+from app.schemas.user import UserCreate, UserResponse, CexConfigUpdate
 from app.services.wallet_service import wallet_service
 
 router = APIRouter()
+
+@router.get("/{user_id}", response_model=UserResponse)
+async def get_user(
+    user_id: str,
+    db: AsyncSession = Depends(get_db)
+) -> Any:
+    """
+    Get generic user data by ID.
+    """
+    try:
+        import uuid
+        u_uuid = uuid.UUID(user_id)
+        result = await db.execute(
+            select(User)
+            .options(selectinload(User.wallets))
+            .where(User.id == u_uuid)
+        )
+        user = result.scalars().first()
+        if not user:
+             raise HTTPException(status_code=404, detail="User not found")
+        return user
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid User ID")
+
+@router.get("/{user_id}/cex-balances")
+async def get_cex_balances(
+    user_id: str,
+    db: AsyncSession = Depends(get_db)
+) -> Any:
+    """
+    Get live balances from configured CEX (Binance).
+    """
+    try:
+        import uuid
+        from app.services.cex_service import cex_service
+        from app.core.config import settings
+        
+        u_uuid = uuid.UUID(user_id)
+        result = await db.execute(
+            select(User)
+            .where(User.id == u_uuid)
+        )
+        user = result.scalars().first()
+        
+        if not user:
+             raise HTTPException(status_code=404, detail="User not found")
+        
+        config = user.cex_config or {}
+        binance_config = config.get("binance", {})
+        
+        # Priority: DB Config > Environment Variables
+        api_key = binance_config.get("api_key") or settings.BINANCE_API_KEY
+        api_secret = binance_config.get("api_secret") or settings.BINANCE_API_SECRET
+        
+        if not api_key:
+            return {"status": "not_configured", "balances": []}
+            
+        # Fetch Real Balances
+        balances = await cex_service.get_user_balance("binance", api_key, api_secret)
+        
+        # Format for Frontend (List)
+        formatted = []
+        for asset, amount in balances.items():
+            formatted.append({
+                "symbol": asset,
+                "amount": amount,
+                "value_usd": 0 # We could fetch price here if needed
+            })
+            
+        return {"status": "connected", "balances": formatted}
+
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.put("/{user_id}/cex-config", response_model=UserResponse)
+async def update_cex_config(
+    user_id: str,
+    config_in: CexConfigUpdate,
+    db: AsyncSession = Depends(get_db)
+) -> Any:
+    """
+    Update CEX Configuration (API Keys).
+    """
+    try:
+        # Cast str to UUID logic happens in DB typically, but let's be careful
+        import uuid
+        u_uuid = uuid.UUID(user_id)
+        
+        result = await db.execute(
+            select(User)
+            .options(selectinload(User.wallets))
+            .where(User.id == u_uuid)
+        )
+        user = result.scalars().first()
+        
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+            
+        # Update JSON config
+        # Merge or Replace? Let's Replace for simplicity
+        user.cex_config = config_in.cex_config
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+        return user
+        
+    except ValueError:
+         raise HTTPException(status_code=400, detail="Invalid User ID format")
 
 @router.post("/", response_model=UserResponse)
 async def create_user(

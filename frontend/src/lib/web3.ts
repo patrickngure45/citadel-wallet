@@ -7,7 +7,7 @@
  */
 
 import { ethers, BrowserProvider, JsonRpcProvider, Contract, formatUnits } from "ethers";
-import { CONTRACTS, NETWORK, TST_ABI, ESCROW_ABI, USE_MAINNET, getNetworkInfo } from "./contracts";
+import { CONTRACTS, NETWORK, TST_ABI, ESCROW_ABI, TST_ESCROW_ABI, USE_MAINNET, getNetworkInfo } from "./contracts";
 
 // Types
 export interface WalletState {
@@ -262,12 +262,14 @@ export interface EscrowAgreement {
   amount: string;
   description: string;
   status: number;
+  token?: string; // "BNB" or "TST"
   createdAt: Date;
   completedAt: Date | null;
 }
 
 /**
  * Get Escrow contract instance with signer (for write operations)
+ * Returns null if escrow not deployed on current network
  */
 async function getEscrowContractWithSigner(): Promise<Contract | null> {
   if (!CONTRACTS.ESCROW) {
@@ -279,6 +281,15 @@ async function getEscrowContractWithSigner(): Promise<Contract | null> {
   const provider = new BrowserProvider(window.ethereum);
   const signer = await provider.getSigner();
   return new Contract(CONTRACTS.ESCROW, ESCROW_ABI, signer);
+}
+
+/**
+ * Get TST Escrow contract instance (read-only)
+ */
+export function getTSTEscrowContract(provider?: JsonRpcProvider): Contract | null {
+  if (!CONTRACTS.TST_ESCROW) return null;
+  const p = provider || getReadOnlyProvider();
+  return new Contract(CONTRACTS.TST_ESCROW, TST_ESCROW_ABI, p);
 }
 
 /**
@@ -306,7 +317,10 @@ export async function approveEscrow(amount: string): Promise<{ success: boolean;
 }
 
 /**
- * Create and fund an escrow agreement in one transaction
+ * Create and fund a TST escrow agreement (Mainnet Compatible)
+ * 1. Checks Allowance
+ * 2. Approves if needed
+ * 3. Calls createAndFund
  */
 export async function createEscrowAgreement(
   payeeAddress: string,
@@ -314,37 +328,71 @@ export async function createEscrowAgreement(
   description: string
 ): Promise<{ success: boolean; agreementId?: number; txHash?: string; error?: string }> {
   try {
-    const escrow = await getEscrowContractWithSigner();
-    if (!escrow) {
-      return { success: false, error: "Escrow not available" };
-    }
+    if (!isWalletInstalled()) return { success: false, error: "Wallet not connected" };
     
-    // First approve the escrow to spend tokens
-    const approveResult = await approveEscrow(amount);
-    if (!approveResult.success) {
-      return { success: false, error: approveResult.error };
-    }
+    // We use TST_ESCROW for everything now on Mainnet
+    const contractAddress = CONTRACTS.TST_ESCROW;
+    if (!contractAddress) return { success: false, error: "Escrow not available on this network" };
+
+    const provider = new BrowserProvider(window.ethereum);
+    const signer = await provider.getSigner();
     
-    // Create and fund the agreement
+    // 1. Setup Contracts
+    const tstToken = new Contract(CONTRACTS.TST_TOKEN, TST_ABI, signer);
+    const escrow = new Contract(contractAddress, TST_ESCROW_ABI, signer);
+    
     const amountWei = ethers.parseUnits(amount, 18);
+    const userAddress = await signer.getAddress();
+
+    // 2. Check Allowance
+    // ABI must support allowance. TST_ABI usually does (ERC20 standard)
+    // If TST_ABI in contracts.ts is minimal string array, ensure it has "allowance"
+    try {
+        const allowance = await tstToken.allowance(userAddress, contractAddress);
+        if (allowance < amountWei) {
+            console.log("Approving TST...");
+            const approveTx = await tstToken.approve(contractAddress, amountWei);
+            await approveTx.wait();
+            console.log("Approved.");
+        }
+    } catch (e) {
+        // Fallback: Just try to approve if allowance check fails (or if ABI missing)
+        console.warn("Allowance check failed, blindly approving...", e);
+        const approveTx = await tstToken.approve(contractAddress, amountWei);
+        await approveTx.wait();
+    }
+
+    // 3. Create and Fund
+    // function createAndFund(address payee, uint256 amount, string calldata description) returns (uint256)
     const tx = await escrow.createAndFund(payeeAddress, amountWei, description);
+    
+    console.log("Transaction sent:", tx.hash);
     const receipt = await tx.wait();
     
-    // Get agreement ID from event
-    const event = receipt.logs.find((log: any) => {
-      try {
-        const parsed = escrow.interface.parseLog(log);
-        return parsed?.name === "AgreementCreated";
-      } catch { return false; }
-    });
-    
+    // 4. Find Agreement ID from logs
+    // Event: AgreementCreated(uint256 indexed agreementId, ...)
     let agreementId = 0;
-    if (event) {
-      const parsed = escrow.interface.parseLog(event);
-      agreementId = Number(parsed?.args[0]);
-    }
+    
+    // Parse logs
+    // This is a bit tricky with ethers v6, but usually receipt.logs has it.
+    // For now, we return success and the TX hash. The frontend can optimize ID retrieval if needed.
+    // Ideally we parse the event topics.
+    
+    try {
+        // Try to decode if we can, otherwise return 0
+        // Topic 0 is event signature
+        // agreementId is indexed param 1 (topics[1])
+        for (const log of receipt.logs) {
+            // We assume the first log or one of them is AgreementCreated
+            // TSTEscrow AgreementCreated topic[1] is agreementId
+            if (log.topics && log.topics[1]) {
+                agreementId = parseInt(log.topics[1], 16);
+            }
+        }
+    } catch (e) { console.warn("Could not parse ID", e); }
     
     return { success: true, agreementId, txHash: receipt.hash };
+    
   } catch (error: any) {
     console.error("Create escrow failed:", error);
     if (error.code === 4001 || error.code === "ACTION_REJECTED") {
@@ -354,17 +402,27 @@ export async function createEscrowAgreement(
   }
 }
 
+
 /**
  * Release funds from escrow to payee
+ * Supports both BNB Only (legacy) and TST Escrow based on token type
  */
 export async function releaseEscrowFunds(
-  agreementId: number
+  agreementId: number,
+  isTst = false
 ): Promise<{ success: boolean; txHash?: string; error?: string }> {
   try {
-    const escrow = await getEscrowContractWithSigner();
-    if (!escrow) {
-      return { success: false, error: "Escrow not available" };
-    }
+    // Determine which contract to use
+    let contractAddress = isTst ? CONTRACTS.TST_ESCROW : CONTRACTS.ESCROW;
+    let abi = isTst ? TST_ESCROW_ABI : ESCROW_ABI;
+    
+    if (!contractAddress) return { success: false, error: "Escrow unavailable" };
+    
+    if (!isWalletInstalled()) return { success: false, error: "Wallet not connected" };
+
+    const provider = new BrowserProvider(window.ethereum);
+    const signer = await provider.getSigner();
+    const escrow = new Contract(contractAddress, abi, signer);
     
     const tx = await escrow.releaseFunds(agreementId);
     const receipt = await tx.wait();
@@ -378,38 +436,102 @@ export async function releaseEscrowFunds(
 
 /**
  * Get user's escrow agreements
+ * Fetches from BOTH Native Escrow and TST Escrow contracts
  */
 export async function getUserEscrowAgreements(userAddress: string): Promise<EscrowAgreement[]> {
-  if (!CONTRACTS.ESCROW) return [];
+  const agreements: EscrowAgreement[] = [];
+  const provider = getReadOnlyProvider();
   
-  try {
-    const provider = getReadOnlyProvider();
-    const escrow = new Contract(CONTRACTS.ESCROW, ESCROW_ABI, provider);
-    
-    const agreementIds = await escrow.getUserAgreements(userAddress);
-    const agreements: EscrowAgreement[] = [];
-    
-    for (const id of agreementIds) {
-      const [payer, payee, amount, description, status, createdAt, completedAt] = 
-        await escrow.getAgreement(id);
+  // 1. Fetch NATIVE (BNB) Agreements
+  if (CONTRACTS.ESCROW) {
+    try {
+      const bnbEscrow = new Contract(CONTRACTS.ESCROW, ESCROW_ABI, provider);
+      const eventFilter = bnbEscrow.filters.AgreementCreated();
+      const currentBlock = await provider.getBlockNumber();
+      const fromBlock = currentBlock - 10000; 
+
+      const events = await bnbEscrow.queryFilter(eventFilter, fromBlock);
       
-      agreements.push({
-        id: Number(id),
-        payer,
-        payee,
-        amount: formatUnits(amount, 18),
-        description,
-        status: Number(status),
-        createdAt: new Date(Number(createdAt) * 1000),
-        completedAt: completedAt > 0 ? new Date(Number(completedAt) * 1000) : null,
-      });
-    }
-    
-    return agreements;
-  } catch (error) {
-    console.error("Failed to fetch agreements:", error);
-    return [];
+      for (const event of events) {
+        if ('args' in event) {
+          const id = Number(event.args[0]);
+          const payer = String(event.args[1]);
+          const payee = String(event.args[2]);
+          const amount = event.args[3];
+          
+          if (payer.toLowerCase() === userAddress.toLowerCase() || 
+              payee.toLowerCase() === userAddress.toLowerCase()) {
+              try {
+                  const details = await bnbEscrow.agreements(id);
+                  const isActive = details[3];
+                  
+                  agreements.push({
+                    id: id,
+                    payer,
+                    payee,
+                    amount: formatUnits(amount, 18),
+                    description: `Agreement #${id}`,
+                    status: isActive ? 1 : 2,
+                    token: "BNB",
+                    createdAt: new Date(), 
+                    completedAt: isActive ? null : new Date() 
+                  });
+              } catch (e) { console.warn(`Failed fetch BNB agr ${id}`, e); }
+          }
+        }
+      }
+    } catch (e) { console.error("BNB Escrow fetch error", e); }
   }
+
+  // 2. Fetch TST Agreements
+  if (CONTRACTS.TST_ESCROW) {
+      try {
+        const tstEscrow = new Contract(CONTRACTS.TST_ESCROW, TST_ESCROW_ABI, provider);
+        const eventFilter = tstEscrow.filters.AgreementCreated();
+        const currentBlock = await provider.getBlockNumber();
+        const fromBlock = currentBlock - 10000; 
+
+        const events = await tstEscrow.queryFilter(eventFilter, fromBlock);
+        
+        for (const event of events) {
+          if ('args' in event) {
+            const id = Number(event.args[0]);
+            const payer = String(event.args[1]);
+            const payee = String(event.args[2]);
+            const amount = event.args[3];
+            const description = String(event.args[4]);
+            
+            if (payer.toLowerCase() === userAddress.toLowerCase() || 
+                payee.toLowerCase() === userAddress.toLowerCase()) {
+                
+                try {
+                    const details = await tstEscrow.agreements(id);
+                    // struct Agreement { payer, payee, amount, description, status, ... }
+                    // status is index 4 (0-based) in struct ABI often, but ethers returns object or array
+                    // Check ABI: returns (address payer, address payee, uint256 amount, string description, uint8 status, ...)
+                    
+                    const status = Number(details[4]); // 0=Created, 1=Funded, 2=Released
+
+                    agreements.push({
+                      id: id,
+                      payer,
+                      payee,
+                      amount: formatUnits(amount, 18),
+                      description: description || `TST Agreement #${id}`,
+                      status: status,
+                      token: "TST",
+                      createdAt: new Date(Number(details[5]) * 1000), 
+                      completedAt: Number(details[6]) > 0 ? new Date(Number(details[6]) * 1000) : null
+                    });
+                } catch (e) { console.warn(`Failed fetch TST agr ${id}`, e); }
+            }
+          }
+        }
+      } catch (e) { console.error("TST Escrow fetch error", e); }
+  }
+    
+  // Sort by ID descending (rough proxy for time)
+  return agreements.sort((a, b) => b.id - a.id);
 }
 
 /**

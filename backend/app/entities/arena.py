@@ -21,7 +21,7 @@ class Arena:
         self.strategy = StrategyEntity()
         self.execution = ExecutionEntity()
 
-    def conduct_hearing(self, user_id: str, intent: str, execute: bool = False) -> HearingRecord:
+    async def conduct_hearing(self, user_id: str, intent: str, execute: bool = False) -> HearingRecord:
         """
         Runs the full cross-examination pipeline.
         
@@ -33,30 +33,30 @@ class Arena:
         
         try:
             # 2. Perception (The Eyes) -> Must always run
-            record = self.perception.process(record)
+            record = await self.perception.process(record)
             if record.perception.status == "OBSTRUCTED":
                 return self._finalize(record, "BLOCKED", "Perception failed to verify reality.")
 
             # 3. Memory (The Context)
-            record = self.memory.process(record)
+            record = await self.memory.process(record)
 
             # 4. Risk (The Veto)
-            record = self.risk.process(record)
+            record = await self.risk.process(record)
             if record.risk.verdict == "VETO":
                 return self._finalize(record, "BLOCKED", f"Risk Veto: {record.risk.blockers}")
 
             # 5. Strategy (The Plan)
-            record = self.strategy.process(record)
+            record = await self.strategy.process(record)
             if not record.strategy.feasible_options:
                 return self._finalize(record, "BLOCKED", "Strategy found no feasible path under Risk constraints.")
 
             # 6. Execution (The Hands)
             if execute:
-                record = self.execution.process(record)
+                record = await self.execution.process(record)
                 if record.execution.status == "SUCCESS":
                     return self._finalize(record, "ALLOWED", "Execution successful.")
                 else:
-                    return self._finalize(record, "ERROR", "Execution failed on chain.")
+                    return self._finalize(record, "ERROR", f"Execution failed: {record.execution.logs}")
             else:
                 return self._finalize(record, "ALLOWED", "Plan approved (Dry Run).")
 

@@ -15,7 +15,8 @@ import {
   X,
   ExternalLink,
   Coins,
-  AlertTriangle
+  AlertTriangle,
+  Bot
 } from "lucide-react";
 import clsx from "clsx";
 import { WalletConnect } from "@/components/WalletConnect";
@@ -55,8 +56,8 @@ export default function AgreementsPage() {
   // Release state
   const [releasingId, setReleasingId] = useState<number | null>(null);
 
-  // Check if escrow is available
-  const escrowAvailable = !!CONTRACTS.ESCROW;
+  // Check if escrow is available (Supports BNB or TST)
+  const escrowAvailable = !!CONTRACTS.ESCROW || !!CONTRACTS.TST_ESCROW;
 
   // Fetch agreements when wallet connects
   useEffect(() => {
@@ -76,6 +77,12 @@ export default function AgreementsPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleAgentCreate = async () => {
+    // Navigate to Entity Matrix with pre-filled intent
+    const intent = `Lock ${amount} TST in Escrow for ${payeeAddress}. Context: ${description}`;
+    router.push(`/hearing?intent=${encodeURIComponent(intent)}`);
   };
 
   const handleCreate = async () => {
@@ -130,10 +137,10 @@ export default function AgreementsPage() {
     }
   };
 
-  const handleRelease = async (agreementId: number) => {
+  const handleRelease = async (agreementId: number, isTst: boolean) => {
     setReleasingId(agreementId);
     
-    const result = await releaseEscrowFunds(agreementId);
+    const result = await releaseEscrowFunds(agreementId, isTst);
     
     if (result.success) {
       fetchAgreements();
@@ -272,10 +279,20 @@ export default function AgreementsPage() {
                         )}>
                           {getStatusIcon(agr.status)}
                           {AGREEMENT_STATUS[agr.status as keyof typeof AGREEMENT_STATUS]}
+                          {agr.token === "TST" && (
+                             <span className="ml-1 px-1 bg-black/30 rounded text-emerald-400">TST</span>
+                          )}
                         </div>
                       </div>
 
                       <p className="text-white/70 text-sm mb-3">{agr.description}</p>
+                      
+                      <div className="flex items-center gap-2 mb-4 p-2 bg-black/20 rounded">
+                         <span className="text-white/50 text-xs">Amount:</span>
+                         <span className="font-mono text-lg font-bold">
+                             {agr.amount} {agr.token || "BNB"}
+                         </span>
+                      </div>
 
                       <div className="grid grid-cols-2 gap-4 text-sm mb-4">
                         <div>
@@ -296,13 +313,13 @@ export default function AgreementsPage() {
                         <div className="flex items-center gap-2">
                           <Coins className="w-4 h-4 text-amber-400" />
                           <span className="font-bold font-mono text-amber-400">
-                            {formatAmount(parseFloat(agr.amount))} TST
+                            {formatAmount(parseFloat(agr.amount))} {agr.token || "BNB"}
                           </span>
                         </div>
                         
                         {canRelease && (
                           <button
-                            onClick={() => handleRelease(agr.id)}
+                            onClick={() => handleRelease(agr.id, agr.token === "TST")}
                             disabled={releasingId === agr.id}
                             className={clsx(
                               "px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors",
@@ -418,35 +435,35 @@ export default function AgreementsPage() {
                 </div>
               )}
 
-              <button
-                onClick={handleCreate}
-                disabled={createStatus === "loading" || createStatus === "success"}
-                className={clsx(
-                  "w-full py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all",
-                  createStatus === "loading" 
-                    ? "bg-indigo-500/20 text-indigo-400 cursor-not-allowed"
-                    : createStatus === "success"
-                    ? "bg-green-500/20 text-green-400 cursor-not-allowed"
-                    : "bg-indigo-600 hover:bg-indigo-500 text-white"
-                )}
-              >
-                {createStatus === "loading" ? (
-                  <>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <button
+                  onClick={handleCreate}
+                  disabled={createStatus === "loading" || createStatus === "success"}
+                  className={clsx(
+                    "py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all",
+                    createStatus === "loading" 
+                      ? "bg-indigo-500/20 text-indigo-400 cursor-not-allowed"
+                      : createStatus === "success"
+                      ? "bg-green-500/20 text-green-400 cursor-not-allowed"
+                      : "bg-white/5 hover:bg-white/10 text-white/80"
+                  )}
+                >
+                  {createStatus === "loading" ? (
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    Creating...
-                  </>
-                ) : createStatus === "success" ? (
-                  <>
-                    <CheckCircle className="w-4 h-4" />
-                    Created!
-                  </>
-                ) : (
-                  <>
+                  ) : (
                     <Lock className="w-4 h-4" />
-                    Lock Funds in Escrow
-                  </>
-                )}
-              </button>
+                  )}
+                  <span>Manual Lock</span>
+                </button>
+
+                <button
+                  onClick={handleAgentCreate}
+                  className="py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 text-emerald-400 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.1)] group"
+                >
+                  <Bot className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+                  <span>Agent Auto-Lock</span>
+                </button>
+              </div>
 
               <p className="text-xs text-center text-white/30">
                 You'll need to approve 2 transactions: TST approval + escrow creation

@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Boolean, DateTime, Integer, func
+from sqlalchemy import Column, String, Boolean, DateTime, Integer, JSON, func
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
 from app.db.base_class import Base
@@ -17,6 +17,10 @@ class User(Base):
     # HD Wallet Derivation Base Index (e.g. 1 for m/44'/60'/0'/0/1)
     # Each user gets a unique base index to derive their wallets across all chains
     derivation_index = Column(Integer, unique=True, index=True, nullable=False)
+    
+    # CEX Integration (Encrypted API Keys ideally, plaintext for trial)
+    # Structure: {"binance": {"api_key": "...", "api_secret": "..."}, "bybit": ...}
+    cex_config = Column(JSON, nullable=True, default={})
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

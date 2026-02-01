@@ -1,6 +1,8 @@
 from fastapi import APIRouter, HTTPException, Depends
+from typing import List
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, desc
 from app.db.session import get_db
 from app.entities.arena import Arena
 from app.schemas.hearing import HearingRecord
@@ -15,6 +17,25 @@ class HearingRequest(BaseModel):
     intent: str
     execute: bool = False
 
+@router.get("/", response_model=List[HearingRecord])
+async def get_recent_hearings(limit: int = 10, db: AsyncSession = Depends(get_db)):
+    """
+    Fetch the audit log of recent agent decisions.
+    """
+    try:
+        result = await db.execute(
+            select(HearingRecordModel)
+            .order_by(desc(HearingRecordModel.started_at))
+            .limit(limit)
+        )
+        records = result.scalars().all()
+        # Convert DB Model JSON back to Pydantic Schema
+        return [HearingRecord(**r.transcript) for r in records]
+    except Exception as e:
+        # If table doesn't exist yet (first run), return empty
+        print(f"⚠️ Error fetching hearings: {e}")
+        return []
+
 @router.post("/gate", response_model=HearingRecord)
 async def run_hearing(request: HearingRequest, db: AsyncSession = Depends(get_db)):
     """
@@ -24,7 +45,7 @@ async def run_hearing(request: HearingRequest, db: AsyncSession = Depends(get_db
     """
     try:
         # 1. Run the Entity Loop (CPU bound, synchronous logic)
-        record = arena.conduct_hearing(
+        record = await arena.conduct_hearing(
             user_id=request.user_id,
             intent=request.intent,
             execute=request.execute
@@ -43,7 +64,7 @@ async def run_hearing(request: HearingRequest, db: AsyncSession = Depends(get_db
             user_id=u_id, 
             intent=record.intent,
             started_at=record.started_at,
-            transcript=record.model_dump(), # Pydantic v2 uses model_dump()
+            transcript=record.model_dump(mode='json'), # Ensure datetime is serialized to string
             final_verdict=record.final_verdict,
             final_reason=record.final_reason
         )

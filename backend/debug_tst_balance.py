@@ -3,10 +3,12 @@ from app.core.config import settings
 
 # CONFIG
 USER_TO_CHECK = "0x578FC7311a846997dc99bF2d4C651418DcFe309A"
-TST_ADDRESS = "0x4B3ff00Bd27a9d75204CceB619d5B1D393dbaE71"
+# Use Testnet Address from .env hints or prev context
+TST_ADDRESS = "0x297aB5E3Cd7798cC5cA75F30fa06e695F4E954f5" 
 
 # SETUP
-w3 = Web3(Web3.HTTPProvider(settings.BSC_RPC_URL))
+# Use Testnet RPC
+w3 = Web3(Web3.HTTPProvider("https://data-seed-prebsc-1-s1.binance.org:8545/"))
 
 ERC20_ABI = [
     {

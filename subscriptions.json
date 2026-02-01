@@ -1,0 +1,11 @@
+[
+  {
+    "id": "SUB-7598",
+    "service": "0xf5C649356608F8713c3C2C7d887aD3ad2580e8ce",
+    "amount": 0.001,
+    "token": "BNB",
+    "frequency": "MONTHLY",
+    "status": "ACTIVE",
+    "next_payment": "IMMEDIATE"
+  }
+]

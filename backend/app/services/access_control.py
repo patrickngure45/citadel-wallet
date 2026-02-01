@@ -1,8 +1,9 @@
 import os
 from app.services.wallet_service import wallet_service
+from app.core.config import settings
 
 # Configuration - Network Toggle
-USE_MAINNET = os.getenv("USE_MAINNET", "false").lower() == "true"
+USE_MAINNET = settings.NEXT_PUBLIC_USE_MAINNET
 
 # Contract addresses per network
 if USE_MAINNET:

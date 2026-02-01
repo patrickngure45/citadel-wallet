@@ -6,14 +6,19 @@ from app.services.access_control import access_control
 # --------------------------------------------------------------------------
 # CONFIG
 # --------------------------------------------------------------------------
-USER_TO_FUND = "0x578FC7311a846997dc99bF2d4C651418DcFe309A"
-AMOUNT_TST = 500
-TST_ADDRESS = "0x4B3ff00Bd27a9d75204CceB619d5B1D393dbaE71"
+# USER ID 0 (Derived from your Master Seed)
+USER_TO_FUND = "0xb5E7D6AC4753E274d6879fCB44aebDceBE75b970" # azurefashion254@gmail.com
+AMOUNT_TST = 100
+AMOUNT_BNB = 0.005
+
+# BSC TESTNET CONFIG
+RPC_URL = "https://data-seed-prebsc-1-s1.binance.org:8545/"
+TST_ADDRESS = "0x297aB5E3Cd7798cC5cA75F30fa06e695F4E954f5"
 
 # --------------------------------------------------------------------------
 # SETUP
 # --------------------------------------------------------------------------
-w3 = Web3(Web3.HTTPProvider(settings.BSC_RPC_URL))
+w3 = Web3(Web3.HTTPProvider(RPC_URL))
 sender_key = settings.DEPLOYER_PRIVATE_KEY
 account = w3.eth.account.from_key(sender_key)
 sender_address = account.address
@@ -44,10 +49,65 @@ ERC20_ABI = [
 
 async def run_faucet():
     print("="*60)
-    print("ADMIN FAUCET: FUNDING USER WITH TST")
+    print("ADMIN FAUCET: FUNDING USER 0 (TESTNET)")
+    print(f"Target: {USER_TO_FUND}")
     print("="*60)
     
     if not w3.is_connected():
+        print("❌ Cannot connect to BSC Testnet")
+        return
+
+    # 1. Check Admin Balances (Gas & Token)
+    admin_bnb = w3.eth.get_balance(sender_address)
+    contract = w3.eth.contract(address=TST_ADDRESS, abi=ERC20_ABI)
+    admin_tst = contract.functions.balanceOf(sender_address).call()
+    
+    print(f"ADMIN WALLET: {sender_address}")
+    print(f"   BNB Balance: {w3.from_wei(admin_bnb, 'ether'):.4f} BNB")
+    print(f"   TST Balance: {admin_tst / 10**18:.2f} TST")
+    
+    if admin_bnb == 0:
+        print("❌ Admin has 0 BNB on Testnet. Cannot pay gas.")
+        print("👉 Go to: https://testnet.binance.org/faucet-smart")
+        return
+
+    # 2. Send BNB (For Gas)
+    # DISABLE FOR GAS REFUEL DEMO
+    # print("\n[1/2] Sending Gas (BNB)...")
+    # try:
+    #     tx = {
+    #         'nonce': w3.eth.get_transaction_count(sender_address),
+    #         'to': USER_TO_FUND,
+    #         'value': w3.to_wei(AMOUNT_BNB, 'ether'),
+    #         'gas': 21000,
+    #         'gasPrice': w3.eth.gas_price,
+    #         'chainId': 97
+    #     }
+    #     signed = w3.eth.account.sign_transaction(tx, sender_key)
+    #     tx_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
+    #     print(f"   ✅ BNB Sent! TX: {w3.to_hex(tx_hash)}")
+    # except Exception as e:
+    #     print(f"   ⚠️ BNB Failed: {e}")
+
+    # 3. Send TST (Token)
+    print("\n[2/2] Sending Tokens (TST)...")
+    try:
+        # Wait a sec for nonce update
+        await asyncio.sleep(3) 
+        
+        amount_wei = AMOUNT_TST * 10**18
+        tx = contract.functions.transfer(USER_TO_FUND, amount_wei).build_transaction({
+            'chainId': 97,
+            'gas': 80000,
+            'gasPrice': w3.eth.gas_price,
+            'nonce': w3.eth.get_transaction_count(sender_address)
+        })
+        signed = w3.eth.account.sign_transaction(tx, sender_key)
+        tx_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
+        print(f"   ✅ TST Sent! TX: {w3.to_hex(tx_hash)}")
+    except Exception as e:
+        print(f"   ⚠️ TST Failed: {e}")
+
         print("Error: Could not connect to BSC.")
         return
 
@@ -83,7 +143,7 @@ async def run_faucet():
         w3.to_checksum_address(USER_TO_FUND),
         amount_wei
     ).build_transaction({
-        'chainId': 56,
+        'chainId': 97,
         'gas': 100000,
         'gasPrice': w3.eth.gas_price,
         'nonce': nonce,

@@ -45,13 +45,15 @@ const CONTRACT_ADDRESSES = {
     TST_TOKEN: "0x4B3ff00Bd27a9d75204CceB619d5B1D393dbaE71",
     TST_ORACLE: "0x297aB5E3Cd7798cC5cA75F30fa06e695F4E954f5",
     // TSTEscrow contract on mainnet
-    ESCROW: "0x922bA3bD7866F92F0Caa2A544bb303A38922fb12",
+    ESCROW: null as string | null, // Native BNB Escrow (Not deployed on Mainnet yet)
+    TST_ESCROW: "0x922bA3bD7866F92F0Caa2A544bb303A38922fb12", 
   },
   testnet: {
     // Testnet deployments (for development)
     TST_TOKEN: "0x297aB5E3Cd7798cC5cA75F30fa06e695F4E954f5",
     TST_ORACLE: null as string | null,
-    ESCROW: "0x4B3ff00Bd27a9d75204CceB619d5B1D393dbaE71",
+    ESCROW: "0x4B3ff00Bd27a9d75204CceB619d5B1D393dbaE71", // Native BNB Escrow
+    TST_ESCROW: "0x922bA3bD7866F92F0Caa2A544bb303A38922fb12", // TST Token Escrow
   },
 };
 
@@ -63,7 +65,11 @@ const CONTRACT_ADDRESSES = {
 export const NETWORK = USE_MAINNET ? NETWORKS.mainnet : NETWORKS.testnet;
 
 // Active Contract Addresses
-export const CONTRACTS = USE_MAINNET ? CONTRACT_ADDRESSES.mainnet : CONTRACT_ADDRESSES.testnet;
+export const CONTRACTS = USE_MAINNET ? CONTRACT_ADDRESSES.mainnet : {
+    ...CONTRACT_ADDRESSES.testnet,
+    // Fallback if TST_ESCROW is missing in testnet config above
+    TST_ESCROW: "0x922bA3bD7866F92F0Caa2A544bb303A38922fb12"
+};
 
 // Helper to check network status
 export const getNetworkInfo = () => ({
@@ -102,29 +108,33 @@ export const TST_ABI = [
 // TST Escrow Contract ABI (for P2P agreements)
 export const ESCROW_ABI = [
   // Read Functions
-  "function tstToken() view returns (address)",
-  "function admin() view returns (address)",
-  "function agreementCount() view returns (uint256)",
-  "function agreements(uint256) view returns (address payer, address payee, uint256 amount, string description, uint8 status, uint256 createdAt, uint256 completedAt)",
-  "function getAgreement(uint256 agreementId) view returns (address payer, address payee, uint256 amount, string description, uint8 status, uint256 createdAt, uint256 completedAt)",
-  "function getUserAgreements(address user) view returns (uint256[])",
-  "function getAgreementCount() view returns (uint256)",
+  "function agreements(uint256) view returns (address payer, address payee, uint256 amount, bool isActive)",
   
   // Write Functions
-  "function createAgreement(address payee, uint256 amount, string description) returns (uint256)",
-  "function depositFunds(uint256 agreementId)",
+  "function createAgreement(uint256 agreementId, address payee) payable",
+  "function releaseFunds(uint256 agreementId)",
+  "function refundPayer(uint256 agreementId)",
+  
+  // Events
+  "event AgreementCreated(uint256 indexed agreementId, address indexed payer, address indexed payee, uint256 amount)",
+  "event FundsReleased(uint256 indexed agreementId, address indexed payee, uint256 amount)",
+  "event FundsRefunded(uint256 indexed agreementId, address indexed payer, uint256 amount)",
+];
+
+export const TST_ESCROW_ABI = [
+  // Read
+  "function agreements(uint256) view returns (address payer, address payee, uint256 amount, string description, uint8 status, uint256 createdAt, uint256 completedAt)",
+  "function userAgreements(address, uint256) view returns (uint256)", 
+  
+  // Write
   "function createAndFund(address payee, uint256 amount, string description) returns (uint256)",
   "function releaseFunds(uint256 agreementId)",
-  "function refundFunds(uint256 agreementId)",
-  "function cancelAgreement(uint256 agreementId)",
   
   // Events
   "event AgreementCreated(uint256 indexed agreementId, address indexed payer, address indexed payee, uint256 amount, string description)",
-  "event FundsDeposited(uint256 indexed agreementId, uint256 amount)",
   "event FundsReleased(uint256 indexed agreementId, address indexed payee, uint256 amount)",
-  "event FundsRefunded(uint256 indexed agreementId, address indexed payer, uint256 amount)",
-  "event AgreementCancelled(uint256 indexed agreementId)",
 ];
+
 
 // Agreement Status Enum (matches Solidity contract)
 export const AGREEMENT_STATUS = {

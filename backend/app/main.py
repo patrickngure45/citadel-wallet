@@ -4,6 +4,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.v1.api import api_router
 
+# 1. Ensure all Database Models are imported and registered with SQLAlchemy
+# This prevents "Mapper failed to locate name" errors for relationships (User <-> Wallet)
+import app.db.base
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json"
@@ -14,6 +18,8 @@ app = FastAPI(
 origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
 ]
 
 # Add any others from settings
@@ -23,9 +29,11 @@ if settings.BACKEND_CORS_ORIGINS:
         if origin_str not in origins:
             origins.append(origin_str)
 
+print(f"✅ CORS Origins Configured: {origins}")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=origins, 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -4,9 +4,18 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { motion } from "framer-motion";
-import { Wallet, ArrowUpRight, ArrowDownLeft, RefreshCw, LogOut, Shield, Lock, CheckCircle, XCircle, ExternalLink, Coins, Send, X, ShoppingCart, History, Clock } from "lucide-react";
+import { 
+  Wallet, ArrowUpRight, ArrowDownLeft, RefreshCw, LogOut, 
+  Shield, Lock, CheckCircle, XCircle, ExternalLink, Coins, 
+  Send, X, ShoppingCart, History, Clock, Bot, Activity, BrainCircuit
+} from "lucide-react";
 import clsx from "clsx";
 import { WalletConnect } from "@/components/WalletConnect";
+import { CexPanel } from "@/components/CexPanel";
+import { YieldPanel } from "@/components/YieldPanel";
+import { SubscriptionPanel } from "@/components/SubscriptionPanel";
+import { SecurityPanel } from "@/components/SecurityPanel";
+import { ProtocolStats } from "@/components/ProtocolStats";
 import { useWeb3 } from "@/hooks/useWeb3";
 import { NETWORK, CONTRACTS } from "@/lib/contracts";
 import { transferTST, getPancakeSwapUrl } from "@/lib/web3";
@@ -68,6 +77,7 @@ export default function Dashboard() {
   const [agreements, setAgreements] = useState<Agreement[]>([]);
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
+  const [hasCexKeys, setHasCexKeys] = useState(false);
   
   // Web3 Hook for blockchain interactions
   const { 
@@ -93,7 +103,17 @@ export default function Dashboard() {
   // Transaction History State
   const [txHistory, setTxHistory] = useState<TxHistory[]>([]);
   const [loadingTx, setLoadingTx] = useState(false);
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+
+  // Agent State
+  interface AgentStatus {
+     status: string;
+     last_active: string | null;
+     recent_actions: any[];
+  }
+  const [agentStatus, setAgentStatus] = useState<AgentStatus>({ status: "LOADING", last_active: null, recent_actions: [] });
+
+  // Use relative path so Next.js Proxy handles it
+  const API_URL = "/api/v1"; 
 
   // Fetch transaction history when wallet connects
   useEffect(() => {
@@ -101,6 +121,36 @@ export default function Dashboard() {
       fetchTxHistory(walletAddress);
     }
   }, [walletAddress]);
+  
+  // Check login
+  useEffect(() => {
+    const storedUserId = localStorage.getItem("citadel_user_id");
+    if (!storedUserId) {
+      router.push("/");
+      return;
+    }
+    setUserId(storedUserId);
+    fetchBalances(storedUserId);
+    fetchAgreements(storedUserId);
+    fetchUserPermissions(storedUserId);
+    fetchAgentStatus(storedUserId);
+  }, [router]);
+
+  const fetchAgentStatus = async (id: string) => {
+      try {
+          const res = await axios.get(`${API_URL}/agent/summary`);
+          setAgentStatus(res.data);
+      } catch (e) {
+          console.error("Failed to fetch agent status", e);
+      }
+  };
+
+  // Real-time Autopilot Monitoring (Poll every 2s)
+  useEffect(() => {
+    if (!userId) return;
+    const interval = setInterval(() => fetchAgentStatus(userId), 2000);
+    return () => clearInterval(interval);
+  }, [userId]);
 
   const fetchTxHistory = async (address: string) => {
     setLoadingTx(true);
@@ -141,17 +191,19 @@ export default function Dashboard() {
     }
   };
 
-  useEffect(() => {
-    // In a real app, this would come from a secure session/cookie
-    const storedUserId = localStorage.getItem("citadel_user_id");
-    if (!storedUserId) {
-      router.push("/");
-      return;
+  // REPLACED BY NEW LOGIN CHECK IN LINES 95-108
+  // Keeping simple user permission fetch if needed standalone
+  
+  const fetchUserPermissions = async (id: string) => {
+    try {
+        const res = await axios.get(`${API_URL}/users/${id}`);
+        if (res.data.cex_config && res.data.cex_config.binance) {
+            setHasCexKeys(true);
+        }
+    } catch (error) {
+        console.error("Failed to fetch user permissions", error);
     }
-    setUserId(storedUserId);
-    fetchBalances(storedUserId);
-    fetchAgreements(storedUserId);
-  }, [router]);
+  };
 
   const fetchAgreements = async (id: string) => {
     try {
@@ -203,17 +255,20 @@ export default function Dashboard() {
     localStorage.removeItem("citadel_user_id");
     router.push("/");
   };
+  
+  // Remove the old useEffect that was failing
+
 
   const handleTransfer = async () => {
     if (!transferTo || !transferAmount) {
-      setTransferMessage("Please fill in all fields");
+      setTransferMessage("Input Directive Incomplete");
       setTransferStatus("error");
       return;
     }
 
     // Validate address
     if (!/^0x[a-fA-F0-9]{40}$/.test(transferTo)) {
-      setTransferMessage("Invalid wallet address");
+      setTransferMessage("Invalid Vector Destination");
       setTransferStatus("error");
       return;
     }
@@ -221,7 +276,7 @@ export default function Dashboard() {
     // Validate amount
     const amount = parseFloat(transferAmount);
     if (isNaN(amount) || amount <= 0) {
-      setTransferMessage("Invalid amount");
+      setTransferMessage("Invalid Vector Quantity");
       setTransferStatus("error");
       return;
     }
@@ -233,7 +288,7 @@ export default function Dashboard() {
 
     if (result.success) {
       setTransferStatus("success");
-      setTransferMessage(`Sent! TX: ${result.txHash?.slice(0, 10)}...`);
+      setTransferMessage(`Transmission Output: ${result.txHash?.slice(0, 10)}...`);
       setTransferTo("");
       setTransferAmount("");
       // Refresh balance after 3 seconds
@@ -242,7 +297,7 @@ export default function Dashboard() {
       }, 3000);
     } else {
       setTransferStatus("error");
-      setTransferMessage(result.error || "Transfer failed");
+      setTransferMessage(result.error || "Transmission Failed");
     }
   };
 
@@ -263,30 +318,30 @@ export default function Dashboard() {
     <div className="min-h-screen bg-black text-white font-sans selection:bg-indigo-500/30">
       
       {/* Navbar */}
-      <nav className="border-b border-white/10 bg-white/5 backdrop-blur-xl sticky top-0 z-50">
+      <nav className="border-b border-white/10 bg-black/50 backdrop-blur-xl sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-indigo-500/20 rounded-lg border border-indigo-500/50 flex items-center justify-center">
-                <Wallet className="w-4 h-4 text-indigo-400" />
+              <div className="w-8 h-8 bg-cyan-500/10 rounded-lg border border-cyan-500/30 flex items-center justify-center">
+                <Wallet className="w-4 h-4 text-cyan-400" />
               </div>
-              <span className="font-bold tracking-tight">Citadel</span>
+              <span className="font-bold tracking-tight text-lg">CITADEL <span className="text-white/30 font-light">CORE</span></span>
             </div>
             <div className="flex items-center gap-4">
               <button 
                   onClick={() => router.push('/hearing')} 
-                  className="hidden md:flex items-center gap-2 text-sm font-medium text-indigo-300 hover:text-white transition-colors bg-indigo-500/10 hover:bg-indigo-500/20 px-3 py-1.5 rounded-full border border-indigo-500/20"
+                  className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-cyan-300 hover:text-white transition-colors bg-cyan-500/10 hover:bg-cyan-500/20 px-4 py-1.5 rounded-sm border border-cyan-500/20"
               >
-                 <span>Entity Room</span>
+                 <span className="hidden sm:inline">Entity Matrix</span>
                  <ExternalLink size={14} />
               </button>
 
               {/* Web3 Wallet Connect */}
               <WalletConnect />
-              <button onClick={() => fetchBalances(userId!)} className="p-2 hover:bg-white/5 rounded-full transition-colors">
+              <button onClick={() => fetchBalances(userId!)} className="p-2 hover:bg-white/5 rounded-full transition-colors" title="Sync">
                 <RefreshCw className={clsx("w-4 h-4 text-white/50", loading && "animate-spin")} />
               </button>
-              <button onClick={handleLogout} className="p-2 hover:bg-white/5 rounded-full transition-colors text-red-400">
+              <button onClick={handleLogout} className="p-2 hover:bg-white/5 rounded-full transition-colors text-red-400" title="Exit">
                 <LogOut className="w-4 h-4" />
               </button>
             </div>
@@ -296,13 +351,29 @@ export default function Dashboard() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         
+        {/* Protocol Network Status */}
+        <ProtocolStats />
+
         {/* Portfolio Value */}
         <section>
-            <p className="text-white/40 text-sm font-medium uppercase tracking-wider mb-1">Total Net Worth (Est.)</p>
-            <h1 className="text-4xl font-bold tracking-tighter text-white">
+            <p className="text-white/40 text-xs font-bold uppercase tracking-widest mb-1">Total System Liquidity (Est.)</p>
+            <h1 className="text-4xl font-mono font-bold tracking-tighter text-white">
                 ${getTotalValue().toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </h1>
         </section>
+
+        <CexPanel 
+            userId={userId} 
+            hasKeys={hasCexKeys} 
+            onUpdate={() => userId && fetchUserPermissions(userId)} 
+        />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <YieldPanel />
+            <div className="space-y-4">
+                <SubscriptionPanel />
+                <SecurityPanel />
+            </div>
+        </div>
 
         {/* Assets Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -509,6 +580,96 @@ export default function Dashboard() {
           </section>
         )}
 
+        {/* Agent Status Panel - INTELLIGENCE PLANE */}
+        <section className="mt-8 mb-8">
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                    <Bot className="w-5 h-5 text-emerald-400" />
+                    <h2 className="text-xl font-bold text-white">Agent Status</h2>
+                </div>
+                <button 
+                  onClick={() => router.push("/hearing")} 
+                  className="text-xs text-white/50 hover:text-white flex items-center gap-1"
+                >
+                  <ExternalLink size={12} /> Console
+                </button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* 1. Health Card */}
+                <div className="p-6 rounded-2xl bg-[#0F1218] border border-white/5 relative overflow-hidden group">
+                   <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <div className="text-xs text-white/40 uppercase tracking-widest font-bold mb-1">AUTOPILOT</div>
+                        <div className="flex items-center gap-2">
+                            <div className={clsx("w-3 h-3 rounded-full animate-pulse", 
+                                agentStatus.status === "ONLINE" ? "bg-emerald-500" : "bg-red-500"
+                            )} />
+                            <span className={clsx("font-mono font-bold text-xl",
+                                agentStatus.status === "ONLINE" ? "text-emerald-400" : "text-white/40"
+                            )}>
+                                {agentStatus.status}
+                            </span>
+                        </div>
+                      </div>
+                      <BrainCircuit className={clsx("w-8 h-8 opacity-20", agentStatus.status === "ONLINE" ? "text-emerald-500" : "text-gray-500")} />
+                   </div>
+                   {agentStatus.last_active && (
+                       <div className="text-xs text-white/30 font-mono">
+                           Last Heartbeat: {new Date(agentStatus.last_active).toLocaleTimeString()}
+                       </div>
+                   )}
+                </div>
+
+                {/* 2. Recent Actions Feed */}
+                <div className="p-6 rounded-2xl bg-[#0F1218] border border-white/5">
+                    <div className="text-xs text-white/40 uppercase tracking-widest font-bold mb-3">RECENT DECISIONS</div>
+                    <div className="space-y-3">
+                        {agentStatus.recent_actions.length === 0 && (
+                            <div className="text-white/20 text-xs italic">No info in the cortex.</div>
+                        )}
+                        {agentStatus.recent_actions.map((act: any) => {
+                            // Extract Strategy/Profit Info if available
+                            let strategyInfo = null;
+                            const steps = act.transcript?.strategy?.feasible_options?.[0]?.steps;
+                            if (steps) {
+                                const spread = steps.find((s: string) => s.includes("Spread:"));
+                                const profit = steps.find((s: string) => s.includes("Profit"));
+                                if (spread || profit) strategyInfo = spread || profit;
+                            }
+                            if (!strategyInfo && act.transcript?.execution?.tx_hash?.includes("Arb Profit")) {
+                                strategyInfo = act.transcript.execution.tx_hash;
+                            }
+
+                            return (
+                                <div key={act.id} className="flex flex-col gap-1 text-sm group cursor-pointer p-2 rounded hover:bg-white/5 transition-colors" onClick={() => router.push(`/hearing?id=${act.id}`)}>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2 overflow-hidden">
+                                             <div className={clsx("w-1.5 h-1.5 rounded-full flex-shrink-0",
+                                                 (act.verdict === "ALLOWED" || act.verdict === "EXECUTED") ? "bg-green-500" : "bg-red-500"
+                                             )} />
+                                             <span className="truncate text-white/90 font-medium">{act.intent.replace("AUTOPILOT: ", "")}</span>
+                                        </div>
+                                        <span className="text-[10px] text-white/30 font-mono">{new Date(act.time).toLocaleTimeString()}</span>
+                                    </div>
+                                    {act.reason && (
+                                        <div className="pl-3.5 text-xs text-indigo-400/80 font-mono truncate">
+                                            ↳ {act.reason}
+                                        </div>
+                                    )}
+                                    {strategyInfo && (
+                                        <div className="pl-3.5 text-xs text-emerald-400 font-mono font-bold truncate flex items-center gap-1">
+                                            <ArrowUpRight className="w-3 h-3" /> {strategyInfo}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
+        </section>
+
         {/* Premium Services / TST Gate */}
         <section>
             <div className="flex items-center gap-2 mb-4">
@@ -600,32 +761,47 @@ export default function Dashboard() {
             {/* Active Agreements List */}
             {agreements.length > 0 && (
                 <div className="mt-8">
-                    <h3 className="text-lg font-bold text-white mb-4">Active Agreements</h3>
+                    <h3 className="text-lg font-bold text-white mb-4">On-Chain Escrows (Verified)</h3>
                     <div className="space-y-3">
                         {agreements.map((agreement) => (
                             <motion.div 
                                 key={agreement.id} 
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                className="p-4 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between"
+                                className="p-4 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between group"
                             >
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400">
                                         <Lock className="w-5 h-5" />
                                     </div>
                                     <div>
-                                        <h4 className="font-bold text-white text-sm">{agreement.title}</h4>
-                                        <p className="text-xs text-white/50">To: {agreement.counterparty_email}</p>
+                                        <h4 className="font-bold text-white text-sm">{agreement.counterparty_email}</h4>
+                                        <div className="flex items-center gap-2 text-xs text-white/50">
+                                            {agreement.contract_address && agreement.contract_address !== "OFF_CHAIN_NEGOTIATION" && (
+                                                <a 
+                                                    href={`${NETWORK.explorer}/address/${agreement.contract_address}`}
+                                                    target="_blank"
+                                                    className="flex items-center gap-1 hover:text-indigo-400 transition-colors"
+                                                >
+                                                    <ExternalLink size={10} /> Smart Contract
+                                                </a>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="text-right">
                                     <p className="font-mono font-bold text-indigo-400 text-sm">{agreement.amount} {agreement.token_symbol}</p>
-                                    <span className={clsx(
-                                        "text-[10px] uppercase font-bold px-2 py-0.5 rounded",
-                                        agreement.status === "PENDING" ? "bg-yellow-500/20 text-yellow-500" :
-                                        agreement.status === "ACTIVE" ? "bg-green-500/20 text-green-500" :
-                                        "bg-white/10 text-white/50"
-                                    )}>{agreement.status}</span>
+                                    <div className="flex items-center gap-2 justify-end">
+                                        <span className={clsx(
+                                            "text-[10px] uppercase font-bold px-2 py-0.5 rounded",
+                                            agreement.status === "PENDING" ? "bg-yellow-500/20 text-yellow-500" :
+                                            agreement.status === "ACTIVE" ? "bg-green-500/20 text-green-500" :
+                                            "bg-white/10 text-white/50"
+                                        )}>{agreement.status}</span>
+                                        <button className="text-white/20 hover:text-white transition-colors" title="Release Funds (Coming Soon)">
+                                            <CheckCircle className="w-4 h-4" />
+                                        </button>
+                                    </div>
                                 </div>
                             </motion.div>
                         ))}

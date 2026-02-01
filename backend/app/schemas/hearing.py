@@ -1,6 +1,6 @@
 from typing import List, Optional, Dict, Any, Literal
 from pydantic import BaseModel, Field, validator
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 
 # --- 1. Perception Logic ---
@@ -25,8 +25,10 @@ class Precedent(BaseModel):
 
 class MemoryOutput(BaseModel):
     known_user: bool
+    derivation_index: Optional[int] = None
     relevant_precedents: List[Precedent] = []
     anomalies: List[str] = [] 
+    cex_config: Optional[Dict[str, Any]] = None # {"binance": {...}}
 
 # --- 3. Risk Logic ---
 class RiskRule(BaseModel):
@@ -62,14 +64,15 @@ class ExecutionResult(BaseModel):
 # --- The Master Record ---
 class HearingRecord(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    started_at: datetime = Field(default_factory=datetime.utcnow)
+    # Ensure timezone-aware UTC to prevent double-conversion by drivers
+    started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     # The Intent (Input)
     user_id: str
     intent: str
     
     # The Cross-Examination Chain
-    perception: PerceptionOutput
+    perception: Optional[PerceptionOutput] = None
     memory: Optional[MemoryOutput] = None
     risk: Optional[RiskOutput] = None
     strategy: Optional[StrategyOutput] = None

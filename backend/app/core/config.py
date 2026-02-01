@@ -48,6 +48,14 @@ class Settings(BaseSettings):
     # Wallet / Master Key
     # Added default for initial deployment safety
     CITADEL_MASTER_SEED: str = "deployment-placeholder-seed-change-in-prod"
+    
+    # AI Keys
+    GROQ_API_KEY: str = ""
+    GOOGLE_API_KEY: str = ""
+    
+    # CEX Keys
+    BINANCE_API_KEY: str = ""
+    BINANCE_API_SECRET: str = ""
 
     # RPC Nodes (Defaults to public/free tiers for dev)
     ETHEREUM_RPC_URL: str = "https://eth.llamarpc.com"
@@ -56,6 +64,9 @@ class Settings(BaseSettings):
     
     # Optional deployer key for gas pumping
     DEPLOYER_PRIVATE_KEY: str = ""
+    
+    # Network Toggles
+    NEXT_PUBLIC_USE_MAINNET: bool = True
 
     model_config = SettingsConfigDict(
         env_file=".env",  

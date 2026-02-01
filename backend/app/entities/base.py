@@ -8,7 +8,7 @@ class BaseEntity(ABC):
     """
     
     @abstractmethod
-    def process(self, record: HearingRecord) -> HearingRecord:
+    async def process(self, record: HearingRecord) -> HearingRecord:
         """
         Takes the current state of the HearingRecord, appends its unique contribution,
         and returns the updated record.

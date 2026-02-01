@@ -14,6 +14,37 @@ from app.services.access_control import access_control
 
 router = APIRouter()
 
+@router.get("/subscriptions", response_model=List[Any])
+async def get_subscriptions():
+    """
+    Fetch active subscriptions from the local JSON registry.
+    """
+    import json
+    import os
+    
+    db_path = "subscriptions.json"
+    if not os.path.exists(db_path):
+        return []
+    
+    try:
+        with open(db_path, "r") as f:
+            data = json.load(f)
+            # Normalize for frontend
+            results = []
+            for sub in data:
+               results.append({
+                   "id": sub["id"],
+                   "name": f"Subscription {sub['service'][:6]}",
+                   "amount": f"{sub['amount']} {sub['token']}",
+                   "frequency": sub["frequency"],
+                   "nextPayment": "Auto",
+                   "status": sub["status"]
+               })
+            return results
+    except Exception as e:
+        print(f"Error reading subscriptions: {e}")
+        return []
+
 @router.post("/{user_id}/create", response_model=AgreementResponse)
 async def create_p2p_agreement(
     user_id: uuid.UUID,
