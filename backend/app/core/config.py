@@ -36,8 +36,11 @@ class Settings(BaseSettings):
 
     @field_validator("DATABASE_URL", mode="before")
     def assemble_db_connection(cls, v: Union[str, None]) -> Any:
-        if isinstance(v, str) and v.startswith("postgresql://"):
-            return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        if isinstance(v, str):
+            if v.startswith("postgres://"):
+                v = v.replace("postgres://", "postgresql://", 1)
+            if v.startswith("postgresql://"):
+                return v.replace("postgresql://", "postgresql+asyncpg://", 1)
         return v
 
     # Security
