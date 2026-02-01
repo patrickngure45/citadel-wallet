@@ -36,7 +36,7 @@ export function ProtocolStats() {
   useEffect(() => {
     async function fetchStats() {
       try {
-        const res = await fetch("http://localhost:8000/api/v1/protocol/stats");
+        const res = await fetch("/api/v1/protocol/stats");
         if (res.ok) {
           const json = await res.json();
           setData(json);
